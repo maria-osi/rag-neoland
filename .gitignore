@@ -1,0 +1,15 @@
+.env
+.venv/
+chroma_db/
+
+# Material del curso (pesado y ajeno)
+*.pdf
+
+# Editor y memoria local
+.vscode/
+.memsearch/
+
+# Python
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
