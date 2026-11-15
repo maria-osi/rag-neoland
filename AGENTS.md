@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Proyecto de aprendizaje: bootcamp de RAG (Neoland). Quien lo usa está aprendiendo Python e IA ahora mismo.
+Proyecto de aprendizaje: bootcamp Neoland. Quien lo usa está aprendiendo Python e IA ahora mismo.
 
 ## Gestión del entorno: siempre `uv`
 
