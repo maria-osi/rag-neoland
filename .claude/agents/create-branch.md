@@ -1,5 +1,6 @@
 ---
 name: create-branch
+model: haiku
 description: "Abre la rama de trabajo número-tipo-descripcion desde la rama base. Lo llama el orquestador delivery-workflow al empezar, después de pull-changes."
 skills:
   - create-branch

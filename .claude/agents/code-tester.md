@@ -1,5 +1,6 @@
 ---
 name: code-tester
+model: sonnet
 description: "Escribe y ejecuta los tests de la ronda (unitarios, de lógica de negocio, de UI y de punta a punta) que pide el plan de la issue. No edita producción ni documentación. Lo llama el orquestador delivery-workflow en cada ronda, siempre nuevo."
 skills:
   - issue-spec

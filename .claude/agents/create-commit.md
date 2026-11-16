@@ -1,5 +1,6 @@
 ---
 name: create-commit
+model: haiku
 description: "Guarda un commit en la rama actual: el commit vacío chore: open #N al empezar, o un trozo con ficheros nombrados. Lo llama el orquestador delivery-workflow."
 skills:
   - create-empty-commit
