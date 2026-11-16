@@ -13,3 +13,7 @@ chroma_db/
 __pycache__/
 .ipynb_checkpoints/
 .DS_Store
+
+
+# APM dependencies
+apm_modules/
