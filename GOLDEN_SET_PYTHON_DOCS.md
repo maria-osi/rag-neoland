@@ -5,8 +5,8 @@ Conjunto de preguntas de evaluación para la Fase 0 de [TAREA_RAG_A_TEMPO.md](TA
 ## Corpus
 
 - Origen: <https://docs.python.org/3.15/download.html>, fichero `python-3.15-docs-html.zip` (descargado el 2026-11-16).
-- Ubicación local: `data/python-docs-3.15/python-3.15-docs-html/` (596 ficheros HTML, 88 MB descomprimido).
-- Las rutas de «Fuente» son relativas a esa carpeta. Al convertir a Markdown conservan la estructura de carpetas y cambian solo la extensión (`.html` → `.md`).
+- Corpus que se indexa: `data/python-docs-3.15/python-3.15-docs-md-clean/` (508 ficheros Markdown, 9,6 MB), generado con `scripts/html_a_md.py` y `scripts/limpiar_corpus_md.py` (criterios en `TAREA_RAG_A_TEMPO.md`).
+- Las rutas de «Fuente» están en formato `.html` y son relativas a esa carpeta, cambiando la extensión a `.md`.
 
 ## Cómo se usa
 

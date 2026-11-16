@@ -121,7 +121,7 @@ Un fragmento sobra si quitarlo no cambia el código que escribiría el agente pa
 
 ### Proceso
 
-1. **Descargar el formato original** (HTML) y descomprimirlo en `data/<nombre>/`. La carpeta `data/` está en `.gitignore`.
+1. **Descargar el formato original** (HTML) y descomprimirlo en `data/<nombre>/`. Solo se versiona la copia limpia; el HTML y el Markdown sin limpiar son reproducibles con los scripts y no se suben.
 2. **Convertir a Markdown** una copia fiel de todo el contenido, sin limpiar nada. Es el punto de partida y no se modifica después.
 3. **Limpiar sobre una copia** (`…-md-clean/`), nunca sobre el original. Así se puede deshacer cualquier decisión.
 4. **Medir antes y después** (ficheros, tamaño, cuántas notas y enlaces se tocan por categoría) y guardar el informe.
