@@ -110,3 +110,75 @@ Entregables comunes:
 ### Encaje con el flujo de entrega
 
 Una issue por ficha, con rama `número-tipo-descripcion` y PR en draft por cada una. Además, dos issues comunes: la Fase 0 y la integración en el workflow.
+
+## Criterios de limpieza del corpus
+
+Guía para preparar la documentación de cualquier librería o lenguaje antes de indexarla. Se aplicó por primera vez a la documentación oficial de Python 3.15 (ver `GOLDEN_SET_PYTHON_DOCS.md`). El objetivo del RAG es que un agente escriba código para **una sola versión objetivo**, así que el corpus solo debe contener lo que cambia el código que escribe.
+
+### Principio
+
+Un fragmento sobra si quitarlo no cambia el código que escribiría el agente para la versión objetivo. Un fragmento se queda si evita que el agente use algo que ya no existe o que desaparecerá pronto.
+
+### Proceso
+
+1. **Descargar el formato original** (HTML) y descomprimirlo en `data/<nombre>/`. La carpeta `data/` está en `.gitignore`.
+2. **Convertir a Markdown** una copia fiel de todo el contenido, sin limpiar nada. Es el punto de partida y no se modifica después.
+3. **Limpiar sobre una copia** (`…-md-clean/`), nunca sobre el original. Así se puede deshacer cualquier decisión.
+4. **Medir antes y después** (ficheros, tamaño, cuántas notas y enlaces se tocan por categoría) y guardar el informe.
+5. **Comprobar contra el golden set** que la evidencia de cada pregunta sigue en el texto limpio.
+
+Scripts (en `scripts/`; el uso está en la cabecera de cada uno):
+
+- `html_a_md.py`: paso 2, conversión de HTML de Sphinx a Markdown.
+- `limpiar_corpus_md.py`: paso 3, limpieza con la versión objetivo como parámetro. Las listas de ficheros a quitar son de la documentación de Python y hay que adaptarlas a otro corpus.
+
+### Qué se quita
+
+| Criterio | Qué se quita | Por qué |
+|---|---|---|
+| Historia de otras versiones | Páginas de novedades y changelogs de versiones distintas de la objetivo | No aportan nada para la versión objetivo. El changelog es el fichero más grande y es lista de commits. |
+| Notas «añadido en versión X» | Las de versión anterior a la objetivo | Todo lo anterior existe en la versión objetivo. Se dejan las de la versión objetivo, que marcan lo nuevo. |
+| Notas «cambiado en versión X» | Las de versión anterior a la objetivo, salvo si contienen `deprecat`, `remov`, `no longer`, `must` o `raises` | La descripción actual ya refleja el comportamiento actual. Las excepciones avisan de algo que el agente debe evitar. |
+| Documentación de instalación y entorno | Instalación por sistema operativo, compilación, editores | No cambia el código. |
+| Páginas administrativas | Licencia, copyright, acerca de, informe de errores | No contienen información técnica. |
+| Notas de plataformas que no interesan | Avisos de WebAssembly/WASI | No afectan al destino del código. |
+| Guías de portado desde versiones antiguas | Python 2 a 3, `pyporting` | La versión objetivo no las necesita. |
+| Herramientas de depuración y perfilado del propio intérprete | `gdb`, DTrace, perf | No son código que escriba el agente. |
+| Enlaces | Se dejan solo con su texto, salvo los que apuntan a la documentación oficial | Destinos y tooltips ocupaban el 23 % de los bytes y llenaban los chunks de rutas repetidas. |
+| Líneas de navegación | «Source code: enlace a GitHub» al inicio de cada módulo | Ruido repetido en cientos de páginas. |
+
+### Qué se conserva siempre
+
+- **Avisos de deprecación y eliminación** (`Deprecated since…`, `removed in…`) y las páginas de «pendiente de eliminación» de versiones posteriores a la objetivo. Son lo más útil para que el agente evite APIs que ya no existen o que pronto desaparecen.
+- **Páginas de módulos eliminados** (suelen ocupar unos 600 bytes): dicen qué usar en su lugar y evitan que el agente invente un import.
+- **Notas de implementación y de plataforma** (`Availability`, «detalle de implementación de CPython»): describen comportamiento actual.
+- **Ejemplos y bloques de código**, intactos.
+- **Menciones a versiones antiguas dentro de una descripción**, por ejemplo la compatibilidad con Python 2 de `pickle`. Quitarlas obliga a editar frases sueltas y deja el texto incoherente.
+
+### Decisiones que dependen del caso
+
+Antes de limpiar otro corpus, hay que decidir y anotar:
+
+- **Sistema operativo de destino.** Si es uno solo, se pueden quitar las páginas y notas de los demás. En Python 3.15 se dejó todo.
+- **¿El agente escribe extensiones en código nativo (C)?** Si no, se puede quitar la API de C y los tutoriales de extensiones, que además aportan vocabulario que confunde la recuperación («object», «list», «string»). En Python 3.15 se dejó.
+- **Qué enlaces conservar.** En Python 3.15, solo los que apuntan a la documentación oficial.
+
+### Reglas técnicas para no romper el texto
+
+- No tocar nada dentro de bloques de código. Cuidado con los que abre una lista de definiciones (`:   ` seguido de las tres comillas), que se reconocen como bloque de código igual que los demás.
+- Tratar las notas como **párrafos completos** (hasta la siguiente línea en blanco), no como una sola línea.
+- Una nota con una palabra clave de la lista de excepciones se conserva entera.
+- Después de limpiar, comprobar que no quedan bloques de código con número impar de marcas y que no quedan enlaces sin convertir.
+
+### Resultado en Python 3.15
+
+| | Antes | Después |
+|---|---|---|
+| Ficheros Markdown | 551 | 508 |
+| Tamaño | 19,4 MB | 9,6 MB |
+| Enlaces convertidos a texto | 46 063 | — |
+| Enlaces conservados (documentación oficial) | — | 25 |
+| Notas «Added in» anteriores a 3.15 quitadas | 2 444 | — |
+| Notas «Changed in» anteriores a 3.15 quitadas / conservadas | 2 240 / 337 | — |
+
+Las 32 comprobaciones de evidencia del golden set que se pueden automatizar (preguntas A a D) siguen cumpliéndose sobre el texto limpio. Las de la categoría E son negativas y no dependen del texto limpio.

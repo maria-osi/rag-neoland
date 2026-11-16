@@ -17,3 +17,6 @@ __pycache__/
 
 # APM dependencies
 apm_modules/
+
+# Datos descargados (pesados, reproducibles)
+data/
