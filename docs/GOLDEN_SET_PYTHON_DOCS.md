@@ -17,9 +17,9 @@ Qué cuenta como acierto depende de cómo se compruebe:
 - **Comprobación manual:** la recuperación acierta si entre los k resultados hay un chunk de la fuente indicada que contiene la evidencia.
 - **Evaluación automática** (`scripts/comparar_embeddings.py`) con dos criterios:
   - **Por fuente** (`rango_primer_acierto`): acierta si entre los k resultados hay un chunk de la fuente indicada, o de una de ellas en la categoría D. No mira el texto, así que da resultados iguales o mejores que la comprobación manual.
-  - **Por evidencia** (`rango_primer_acierto_evidencia`): además, el chunk debe contener la subcadena literal de [golden_set_evidencias.json](golden_set_evidencias.json) para esa fuente. Es la versión automática de la comprobación manual.
+  - **Por evidencia** (`rango_primer_acierto_evidencia`): además, el chunk debe contener al menos una de las subcadenas literales que [golden_set_evidencias.json](golden_set_evidencias.json) lista para esa fuente. Cada subcadena es una forma válida de dar la respuesta; la lista recoge redacciones distintas del mismo dato en el corpus. Es la versión automática de la comprobación manual.
 
-`golden_set_evidencias.json` repite los IDs y las fuentes de este documento. Los tests comprueban que coinciden con las tablas y que cada subcadena cabe entera en algún chunk de 500 caracteres. Al añadir una pregunta A-D o cambiar el tamaño de chunk de la configuración base, hay que actualizar el json. `notebooks/06_comparar_tamano_chunk.ipynb` prueba otros tamaños y solapes con el mismo json y lista, por configuración, las evidencias que el troceo deja partidas.
+`golden_set_evidencias.json` repite los IDs y las fuentes de este documento con el formato `{ID: {fuente: [subcadena, ...]}}`. `leer_evidencias` rechaza un valor que no sea una lista no vacía de cadenas no vacías. Los tests comprueban que IDs y fuentes coinciden con las tablas y que cada subcadena, por sí sola, cabe entera en algún chunk de 500 caracteres. Al añadir una pregunta A-D o cambiar el tamaño de chunk de la configuración base, hay que actualizar el json. `notebooks/06_comparar_tamano_chunk.ipynb` prueba otros tamaños y solapes con el mismo json y lista, por configuración, las evidencias que el troceo deja partidas.
 
 Columnas de las tablas:
 

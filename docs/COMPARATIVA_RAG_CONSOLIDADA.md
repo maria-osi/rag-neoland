@@ -14,7 +14,7 @@
 
 El RAG final usa **Qdrant**, embeddings **nomic-embed-text**, troceo de Markdown por estructura con máximo 1500 y mínimo 200, recuperación de **20 candidatos**, reranking local con **MiniLM-L6** y entrega de los **4 mejores chunks**. No se incorpora búsqueda híbrida BM25 porque, una vez aplicado el reranker, solo mejora una pregunta por evidencia y el umbral exigía dos.
 
-En la validación final, esta configuración recupera una fuente correcta entre los cuatro primeros en **30 de 32 preguntas (hit@4 0,938)** y el chunk con la evidencia literal en **22 de 32 (ev_hit@4 0,688)**. La latencia total media fue **153,7 ms** en la máquina de la prueba, con el reranker cargado en MPS.
+En la validación final, esta configuración recupera una fuente correcta entre los cuatro primeros en **30 de 32 preguntas (hit@4 0,938)** y un chunk con alguna de las evidencias literales de la pregunta en **26 de 32 (ev_hit@4 0,813)**. La latencia total media fue **918,3 ms**, en Windows con el reranker en CPU; la validación anterior, con el reranker en MPS, dio 153,7 ms (ver la sección 7).
 
 ## 2. Configuración final
 
@@ -126,12 +126,13 @@ El script [validar_rag_final.py](../scripts/validar_rag_final.py) ejecutó las 3
 | hit@1 por fuente | 0,688 (22/32) |
 | hit@4 por fuente | **0,938 (30/32)** |
 | MRR por fuente | 0,797 |
-| ev_hit@1 | 0,344 (11/32) |
-| ev_hit@4 | **0,688 (22/32)** |
-| ev_MRR | 0,495 |
-| Latencia total media | 153,7 ms |
+| ev_hit@1 | 0,438 (14/32) |
+| ev_hit@4 | **0,813 (26/32)** |
+| ev_MRR | 0,604 |
+| Latencia total media, Windows con reranker en CPU | 918,3 ms |
+| Latencia total media de la validación anterior, reranker en MPS | 153,7 ms |
 
-Los resultados reproducen la fila vectorial con reranking del notebook híbrido. Esto confirma que el módulo integrado no cambió la lógica investigada.
+Las métricas por evidencia usan [golden_set_evidencias.json](golden_set_evidencias.json) con varias evidencias por fuente: A04, A06, A10 y C03 aceptan una segunda redacción de la respuesta. Por eso no son comparables con las de la sección 3 ni con las fichas, medidas con una sola evidencia por fuente. Las métricas por fuente reproducen la fila vectorial con reranking del notebook híbrido, lo que confirma que el módulo integrado no cambió la lógica investigada.
 
 Datos: `data/resultados/validacion_final.csv`.
 
@@ -158,7 +159,7 @@ En un workflow asíncrono con varios agentes debe usarse `AsyncQdrantClient` o e
 
 ### 6.1 La fuente correcta no basta
 
-El hit por fuente sobreestima la calidad. En la configuración final, 30 preguntas encuentran el fichero correcto, pero solo 22 encuentran el chunk que contiene la evidencia. La métrica literal puede ser estricta, pero reveló que el cuello de botella estaba en el troceo y el orden interno, no solo en elegir el fichero.
+El hit por fuente sobreestima la calidad. En la configuración final, 30 preguntas encuentran el fichero correcto, pero solo 26 encuentran un chunk que contiene alguna de sus evidencias. Siguen fallando por evidencia B01, B08, C01 y D03, y A01 y D02 no aciertan ni la fuente. La revisión manual de esos fallos está en la issue #22. Con una sola evidencia por fuente eran 22: A04, A06, A10 y C03 tenían la respuesta en el top 4 con otra redacción.
 
 ### 6.2 El chunking tuvo más impacto estructural que cambiar de modelo
 
@@ -189,8 +190,8 @@ El reranker separó las tres preguntas E de las A-D en este golden set, pero tre
 - Un solo corpus, de Python 3.15 y en inglés.
 - 32 preguntas evaluables; una pregunta cambia una proporción en 0,031.
 - La mayoría de experimentos se ejecutó una vez; las latencias dependen de caché, orden y hardware.
-- El reranker se midió en MPS de Apple. CPU o servidor cambiarán la latencia.
-- La evidencia literal puede marcar como fallo un chunk correcto expresado de otra manera.
+- Las fichas midieron el reranker en MPS de Apple. La validación final, en Windows con el reranker en CPU, dio 918,3 ms de latencia total media frente a 153,7 ms de la validación anterior en MPS. No se midió el mismo equipo con los dos dispositivos, así que el peso del dispositivo en esa diferencia es una hipótesis. Un servidor dará otra cifra.
+- La evidencia literal solo acepta las subcadenas listadas en el json: un chunk correcto con una redacción que no está en la lista cuenta como fallo.
 - No se evaluó la respuesta generada por el LLM, solo la recuperación.
 - La comparación de bases fue local, caliente y solo de lectura; no cubre escrituras, red, réplicas ni fallos.
 - Algunos chunks excepcionales superan el máximo porque un bloque de código indivisible no se corta.
