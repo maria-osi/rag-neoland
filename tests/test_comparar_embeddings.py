@@ -1,4 +1,4 @@
-"""Tests de scripts/comparar_embeddings.py (escenarios 1-8 de la issue #5 y 1-5 de la #7)."""
+"""Tests de scripts/comparar_embeddings.py (escenarios 1-8 de la issue #5, 1-5 de la #7 y 1-9 de la #11)."""
 import shutil
 from pathlib import Path
 
@@ -204,3 +204,125 @@ def test_solape_descarta_tramos_en_blanco(tmp_path):
     assert all(c["texto"].strip() for c in chunks)
     assert [c["id"] for c in chunks] == list(range(len(chunks)))
     assert len(chunks) == 3  # inicios 0, 400, 800, 1200, 1600: los de 400 y 800 son blancos
+
+
+# --- Issue #11: troceo por estructura ---
+
+
+def _md(tmp_path, nombre, texto):
+    (tmp_path / nombre).write_text(texto, encoding="utf-8")
+
+
+def test_estructura_ignora_encabezados_en_codigo(tmp_path):
+    texto = "# Título\n\nUn párrafo.\n\n```\n# comentario\nx = 1\n```\n"
+    _md(tmp_path, "a.md", texto)
+    chunks = ce.trocear_por_estructura(tmp_path, 5000, 0)
+    assert len(chunks) == 1
+    assert chunks[0]["ruta_titulos"] == "Título"
+    assert chunks[0]["texto"] == texto
+
+
+def test_estructura_subdivide_seccion_grande(tmp_path):
+    codigo = "```\n" + "\n".join(f"linea_{i} = {i}" for i in range(10)) + "\n```\n"
+    definicion = "termino\n:   explicacion del termino\n\n    segundo parrafo con sangria\n"
+    texto = (
+        "# T\n\n" + "a" * 300 + "\n\n" + codigo + "\n" + "b" * 300 + "\n\n"
+        + definicion + "\n" + "c" * 300 + "\n"
+    )
+    _md(tmp_path, "a.md", texto)
+    chunks = ce.trocear_por_estructura(tmp_path, 400, 0)
+    assert len(chunks) > 1
+    assert all(len(c["texto"]) <= 400 for c in chunks)
+    assert sum(codigo in c["texto"] for c in chunks) == 1
+    assert sum(definicion.rstrip("\n") in c["texto"] for c in chunks) == 1
+
+
+def test_estructura_bloque_indivisible_entero(tmp_path):
+    codigo = "```\n" + "x = 1\n" * 100 + "```\n"
+    texto = "# T\n\nintro\n\n" + codigo + "\ncierre\n"
+    _md(tmp_path, "a.md", texto)
+    chunks = ce.trocear_por_estructura(tmp_path, 200, 0)
+    grandes = [c for c in chunks if len(c["texto"]) > 200]
+    assert len(grandes) == 1
+    assert codigo in grandes[0]["texto"]
+
+
+def test_estructura_une_secciones_cortas(tmp_path):
+    _md(tmp_path, "a.md", "# Uno\n\ncorta\n\n## Dos\n\n" + "d" * 300 + "\n")
+    _md(tmp_path, "b.md", "# Tres\n\n" + "e" * 300 + "\n\n## Cuatro\n\ncorta final\n")
+    chunks = ce.trocear_por_estructura(tmp_path, 1000, 100)
+    assert len(chunks) == 2
+    a, b = chunks
+    assert a["fuente"] == "a.md" and b["fuente"] == "b.md"
+    assert a["ruta_titulos"] == "Uno"
+    assert "## Dos" in a["texto"] and "# Uno" in a["texto"]
+    assert "corta final" in b["texto"] and "e" * 300 in b["texto"]
+    assert b["ruta_titulos"] == "Tres"
+
+
+def test_estructura_no_parte_definiciones(tmp_path):
+    definicion = "termino\n:   texto de la definicion\n\n    otro parrafo con sangria\n"
+    texto = "# T\n\n" + "a" * 200 + "\n\n" + definicion + "\n" + "b" * 200 + "\n"
+    _md(tmp_path, "a.md", texto)
+    chunks = ce.trocear_por_estructura(tmp_path, 260, 0)
+    assert len(chunks) > 1
+    con = [c for c in chunks if "termino\n" in c["texto"]]
+    assert len(con) == 1
+    assert definicion.rstrip("\n") in con[0]["texto"]
+
+
+def test_estructura_ruta_titulos(tmp_path):
+    texto = (
+        "# `string` — Common string operations\n\nx\n\n## String constants\n\ny\n\n"
+        "### Sub\n\nz\n\n## Otra\n\nw\n"
+    )
+    _md(tmp_path, "a.md", texto)
+    chunks = ce.trocear_por_estructura(tmp_path, 1000, 0)
+    assert [c["ruta_titulos"] for c in chunks] == [
+        "string — Common string operations",
+        "string — Common string operations > String constants",
+        "string — Common string operations > String constants > Sub",
+        "string — Common string operations > Otra",
+    ]
+
+
+@pytest.mark.parametrize("maximo,minimo", [(300, 0), (300, 100), (1000, 200), (50, 10)])
+def test_estructura_reproduce_fichero(tmp_path, maximo, minimo):
+    texto = (
+        "previo sin titulo\n\n# A\n\n" + "a" * 200 + "\n\n```\n# c\n" + "k\n" * 80
+        + "```\n\n## B\n\ncorto\n\ntermino\n:   def\n\n    mas\n\n### C\n\n" + "c" * 500
+        + "\n\n\n\n"
+    )
+    _md(tmp_path, "a.md", texto)
+    _md(tmp_path, "b.md", "# Solo\n\ncorta\n")
+    chunks = ce.trocear_por_estructura(tmp_path, maximo, minimo)
+    for fuente, esperado in (("a.md", texto), ("b.md", "# Solo\n\ncorta\n")):
+        assert "".join(c["texto"] for c in chunks if c["fuente"] == fuente) == esperado
+    assert [c["id"] for c in chunks] == list(range(len(chunks)))
+
+
+def test_texto_a_embeber():
+    chunk = {"ruta_titulos": "A > B", "texto": "hola"}
+    assert ce.texto_a_embeber(chunk, True) == "A > B\n\nhola"
+    assert ce.texto_a_embeber(chunk, False) == "hola"
+
+
+@pytest.mark.parametrize(
+    "maximo,minimo,nombre",
+    [(0, 0, "maximo"), (-5, 0, "maximo"), (100, -1, "minimo"), (100, 100, "minimo"), (100, 150, "minimo")],
+)
+def test_estructura_parametros_invalidos(tmp_path, maximo, minimo, nombre):
+    with pytest.raises(ValueError, match=nombre):
+        ce.trocear_por_estructura(tmp_path, maximo, minimo)
+
+
+def test_estructura_casos_de_borde(tmp_path):
+    _md(tmp_path, "vacio.md", "  \n\n")
+    _md(tmp_path, "abierto.md", "# T\n\n```\n# no es titulo\ncodigo\n")
+    _md(tmp_path, "previo.md", "texto previo\n\n# T\n\n" + "z" * 300 + "\n")
+    chunks = ce.trocear_por_estructura(tmp_path, 1000, 50)
+    assert not [c for c in chunks if c["fuente"] == "vacio.md"]
+    abierto = [c for c in chunks if c["fuente"] == "abierto.md"]
+    assert len(abierto) == 1 and abierto[0]["ruta_titulos"] == "T"
+    previo = [c for c in chunks if c["fuente"] == "previo.md"]
+    assert previo[0]["ruta_titulos"] == ""
