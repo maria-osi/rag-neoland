@@ -16,7 +16,7 @@ Cada pregunta se responde con una decisión, su justificación y la evidencia qu
 
 ¿Hugging Face (open source), OpenAI o Cohere? ver modelos locales de Ollama.
 
-- Decisión: _pendiente_
+- Decisión: **nomic-embed-text en Ollama**, con queries y corpus en inglés. Ver [FICHA_01_EMBEDDINGS.md](FICHA_01_EMBEDDINGS.md).
 - Criterios a comparar: calidad en español, coste, latencia, dependencia de un proveedor externo, dimensión del vector, privacidad de los datos.
 
 ### 2. Base de datos vectorial
@@ -25,13 +25,13 @@ Cada pregunta se responde con una decisión, su justificación y la evidencia qu
 
 - Requisito clave: varios agentes acceden a la BD de forma asíncrona y en paralelo.
 - Hipótesis de partida: Qdrant, desplegado en Docker, porque funciona como servidor independiente con acceso concurrente. Hay que justificarlo con evidencia, no darlo por hecho.
-- Decisión: _pendiente_
+- Decisión: **Qdrant como servidor Docker**. Con 8 clientes concurrentes alcanzó mayor throughput que Chroma y ambos tuvieron cero errores. Ver [FICHA_02_BASE_VECTORIAL.md](FICHA_02_BASE_VECTORIAL.md).
 
 ### 3. Reranking
 
 ¿Necesitamos reranking?
 
-- Decisión: _pendiente_
+- Decisión: **sí**, con `cross-encoder/ms-marco-MiniLM-L-6-v2`: recupera 20 candidatos y conserva los 4 mejores. Ver [FICHA_03_RERANKING.md](FICHA_03_RERANKING.md).
 - Cómo decidirlo: medir si mejora la relevancia de los resultados sobre nuestras preguntas frente a la búsqueda sin reranking, y a qué coste de latencia.
 
 ### 4. Número de respuestas
@@ -40,21 +40,21 @@ Por ejemplo para la pregunta sobre API - metodo HTTP GET - solo necesitamos 1-2 
 ¿Cuántas respuestas necesitamos devolver?
 
 - Hipótesis de partida: 1 o 2 resultados (k=1).
-- Decisión: _pendiente_
+- Decisión: **k=4** resultados finales. Antes del reranking se recuperan 20 candidatos. Ver [FICHA_04_NUMERO_K.md](FICHA_04_NUMERO_K.md).
 - Cómo decidirlo: comprobar con preguntas reales si k=1 basta o si k=2 recupera información que k=1 pierde.
 
 ### 5. Tamaño de chunk
 
 ¿Qué chunk size usamos?
 
-- Decisión: _pendiente_
+- Decisión: **troceo por estructura Markdown**, máximo 1500, mínimo 200 y sin ruta de títulos en el texto embebido. Ver [FICHA_05_CHUNK_SIZE.md](FICHA_05_CHUNK_SIZE.md).
 - Cómo decidirlo: probar la eficacia con varios tamaños sobre el mismo conjunto de preguntas y comparar resultados. Ya hay una prueba previa en el notebook con 300, 500 y 1000 caracteres: con 1000 la misma pregunta devolvió «No encuentro esa información», así que los chunks grandes pueden meter ruido. Falta repetirla de forma sistemática.
 
 ### 6. Búsqueda híbrida
 
 ¿Necesitamos hybrid search (vectorial + palabras clave)?
 
-- Decisión: _pendiente_
+- Decisión: **no incorporarla** al workflow actual. BM25 solo añadió un acierto sobre la configuración con reranking y el umbral exigía dos. Ver [FICHA_06_HYBRID.md](FICHA_06_HYBRID.md).
 - Cómo decidirlo: comprobar si hay preguntas con términos exactos (nombres, códigos, siglas) que la búsqueda semántica falla.
 
 ## Documentación de la investigación
@@ -74,6 +74,17 @@ Hay que documentar lo investigado con la plantilla universitaria de investigaci�
 - Una ficha de investigación por cada una de las 6 preguntas.
 - Tabla resumen con las 6 decisiones y su justificación.
 - Paso «consultar el RAG» integrado en el workflow del agente.
+
+Los tres entregables están completados. La explicación conjunta, los resultados y las reflexiones están en [COMPARATIVA_RAG_CONSOLIDADA.md](COMPARATIVA_RAG_CONSOLIDADA.md). El paso ejecutable está en `scripts/consultar_rag.py` y su validación final en `data/resultados/validacion_final.csv`.
+
+| Pregunta | Decisión final | Evidencia principal |
+|---|---|---|
+| 1. Embeddings | nomic-embed-text | Mejor hit@4 por fuente: 0,906 en la comparación inicial. |
+| 2. Base vectorial | Qdrant servidor | Con 8 clientes: 728,8 consultas/s frente a 607,6 en Chroma; cero errores. |
+| 3. Reranking | MiniLM-L6, 20 → 4 | ev_hit@4: 22 frente a 19 sin reranking. |
+| 4. Número de respuestas | k=4 | k=2 pierde cuatro preguntas por evidencia frente a k=4. |
+| 5. Chunking | Estructura 1500/200, sin ruta | Mejora ev_hit@4 y ev_MRR manteniendo hit@4 por fuente. |
+| 6. Búsqueda híbrida | No incorporar BM25 | Con reranking mejora solo +1 total y +0 en B; umbral +2. |
 
 ## Reparto del trabajo entre 3 personas
 

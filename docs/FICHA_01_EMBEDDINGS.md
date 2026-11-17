@@ -7,12 +7,12 @@
 | Autores | Maria (persona A: indexación) |
 | Fecha | 2026-11-17 |
 | Versión | v1 |
-| Estado | borrador |
+| Estado | cerrada |
 | Pregunta nº | 1 |
 
 ## Resumen (máx. 150 palabras)
 
-Se preguntó qué modelo de embeddings local recupera mejor la documentación de Python 3.15 para nuestro RAG. Se compararon all-MiniLM-L6-v2, bge-base-en-v1.5 y nomic-embed-text sobre el mismo corpus troceado en chunks de 500 caracteres, indexado en Qdrant y en Chroma, con las 35 preguntas del golden set y k=4. Por fuente, nomic-embed-text acierta más (hit@4 0,906 y MRR 0,755), pero la ventaja es de 1-2 preguntas. Por evidencia, los tres empatan en 0,375: el chunk exacto con la respuesta falta a menudo entre los 4 primeros. Qdrant y Chroma dan métricas idénticas. Se elige nomic-embed-text de forma provisional, a revisar tras la ficha 5 (tamaño de chunk), que es la variable que más limita hoy.
+Se preguntó qué modelo de embeddings local recupera mejor la documentación de Python 3.15 para nuestro RAG. Se compararon all-MiniLM-L6-v2, bge-base-en-v1.5 y nomic-embed-text sobre el mismo corpus troceado en chunks de 500 caracteres, indexado en Qdrant y en Chroma, con las 35 preguntas del golden set y k=4. Por fuente, nomic-embed-text acierta más (hit@4 0,906 y MRR 0,755), pero la ventaja es de 1-2 preguntas. Por evidencia, los tres empatan en 0,375: el chunk exacto con la respuesta falta a menudo entre los 4 primeros. Qdrant y Chroma dan métricas idénticas. Se elige nomic-embed-text y la validación final confirma la decisión con la configuración completa.
 
 ## 1. Introducción
 
@@ -154,7 +154,7 @@ Fallos destacados:
 
 | Campo | Contenido |
 |---|---|
-| Decisión | **nomic-embed-text** (Ollama), de forma provisional. |
+| Decisión | **nomic-embed-text** (Ollama). |
 | Motivo principal | Tiene el mejor hit@4 (0,906) y MRR (0,755) por fuente, y el mejor acierto por evidencia en términos exactos (B, 0,70). |
 | Alternativas descartadas | all-MiniLM-L6-v2 queda como alternativa si el tiempo de indexación importa: es 7 veces más rápido y solo pierde 2 preguntas. bge-base-en-v1.5 tiene el peor hit@1 y no mejora a nomic en nada relevante. |
 | Coste o riesgo asumido | 5 minutos de indexación, Ollama como servicio local más y vectores de 768 dimensiones. La ventaja sobre MiniLM es de 1-2 preguntas, dentro del margen de una muestra pequeña. |
