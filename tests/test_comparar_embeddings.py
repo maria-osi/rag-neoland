@@ -357,3 +357,68 @@ def test_metricas_con_k_distinto_de_4(k, hit1, hit_k, mrr):
     assert m["hit@1"] == pytest.approx(hit1)
     assert m[f"hit@{k}"] == pytest.approx(hit_k)
     assert m["mrr"] == pytest.approx(mrr)
+
+
+# Issue #13: reranking (escenarios 1-5)
+
+def _candidatos(n):
+    return [{"posicion": i} for i in range(1, n + 1)]
+
+
+def test_reordena_por_score_y_conserva_orden_en_empates():
+    salida = ce.reordenar_por_score(_candidatos(5), [0.1, 0.9, 0.5, 0.9, 0.3], 3)
+    assert [c["posicion"] for c in salida] == [2, 4, 3]
+
+
+def test_reordena_con_menos_candidatos_que_k():
+    salida = ce.reordenar_por_score(_candidatos(2), [0.2, 0.8], 4)
+    assert [c["posicion"] for c in salida] == [2, 1]
+
+
+def test_reordenar_sin_candidatos_devuelve_vacio():
+    assert ce.reordenar_por_score([], [], 4) == []
+
+
+@pytest.mark.parametrize("scores, k", [([0.1], 2), ([0.1, 0.2, 0.3], 2), ([0.1, 0.2], 0)])
+def test_reordenar_lanza_value_error(scores, k):
+    with pytest.raises(ValueError):
+        ce.reordenar_por_score(_candidatos(2), scores, k)
+
+
+REFERENCIA = {"ev_aciertos": 19, "aciertos": 29}
+
+
+def _op(nombre, ev, fuente, ms):
+    return {"nombre": nombre, "ev_aciertos": ev, "aciertos": fuente, "latencia_ms": ms}
+
+
+def test_reranker_que_cumple_el_criterio():
+    filas, ganador = ce.elegir_reranker(REFERENCIA, [_op("a", 21, 29, 300)], 2, 500)
+    assert filas[0]["cumple"] is True
+    assert filas[0]["mejora_ev"] == 2
+    assert ganador == "a"
+
+
+def test_reranker_que_no_cumple_por_cada_condicion():
+    opciones = [_op("poca_mejora", 20, 29, 300), _op("baja_fuente", 21, 28, 300), _op("lento", 21, 29, 500)]
+    filas, ganador = ce.elegir_reranker(REFERENCIA, opciones, 2, 500)
+    por_nombre = {f["nombre"]: f for f in filas}
+    assert not any(f["cumple"] for f in filas)
+    assert por_nombre["poca_mejora"]["mejora_ev"] == 1
+    assert por_nombre["baja_fuente"]["fuente_no_baja"] is False
+    assert por_nombre["lento"]["latencia_ok"] is False
+    assert ganador is None
+
+
+def test_gana_el_de_mas_aciertos_por_evidencia():
+    _, ganador = ce.elegir_reranker(REFERENCIA, [_op("a", 21, 29, 100), _op("b", 23, 29, 400)], 2, 500)
+    assert ganador == "b"
+
+
+def test_en_empate_gana_el_mas_rapido():
+    _, ganador = ce.elegir_reranker(REFERENCIA, [_op("a", 22, 29, 400), _op("b", 22, 30, 200)], 2, 500)
+    assert ganador == "b"
+
+
+def test_sin_opciones_no_hay_ganador():
+    assert ce.elegir_reranker(REFERENCIA, [], 2, 500) == ([], None)
