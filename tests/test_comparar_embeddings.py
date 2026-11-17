@@ -422,3 +422,87 @@ def test_en_empate_gana_el_mas_rapido():
 
 def test_sin_opciones_no_hay_ganador():
     assert ce.elegir_reranker(REFERENCIA, [], 2, 500) == ([], None)
+
+
+# Issue #15: búsqueda híbrida (escenarios 1-4)
+
+REFERENCIA_HIBRIDA = {
+    "ev_aciertos": 22,
+    "aciertos": 30,
+    "ev_aciertos_b": 8,
+    "busqueda_ms": 30,
+}
+
+
+def test_hibrida_cumple_por_mejora_total():
+    hibrida = {
+        "ev_aciertos": 24,
+        "aciertos": 30,
+        "ev_aciertos_b": 8,
+        "busqueda_ms": 90,
+    }
+    resultado = ce.evaluar_hibrida(REFERENCIA_HIBRIDA, hibrida, 2, 100)
+    assert resultado == {
+        "mejora_ev": 2,
+        "mejora_ev_b": 0,
+        "fuente_no_baja": True,
+        "latencia_anadida_ms": 60,
+        "latencia_ok": True,
+        "cumple": True,
+    }
+
+
+def test_hibrida_cumple_por_mejora_en_categoria_b():
+    hibrida = {
+        "ev_aciertos": 23,
+        "aciertos": 30,
+        "ev_aciertos_b": 10,
+        "busqueda_ms": 50,
+    }
+    resultado = ce.evaluar_hibrida(REFERENCIA_HIBRIDA, hibrida, 2, 100)
+    assert resultado["mejora_ev"] == 1
+    assert resultado["mejora_ev_b"] == 2
+    assert resultado["cumple"] is True
+
+
+@pytest.mark.parametrize(
+    "hibrida, condicion_que_falla",
+    [
+        (
+            {"ev_aciertos": 23, "aciertos": 30, "ev_aciertos_b": 9, "busqueda_ms": 50},
+            "mejora",
+        ),
+        (
+            {"ev_aciertos": 24, "aciertos": 29, "ev_aciertos_b": 8, "busqueda_ms": 50},
+            "fuente",
+        ),
+        (
+            {"ev_aciertos": 24, "aciertos": 30, "ev_aciertos_b": 8, "busqueda_ms": 130},
+            "latencia",
+        ),
+    ],
+)
+def test_hibrida_no_cumple_por_cada_condicion(hibrida, condicion_que_falla):
+    resultado = ce.evaluar_hibrida(REFERENCIA_HIBRIDA, hibrida, 2, 100)
+    assert resultado["cumple"] is False
+    if condicion_que_falla == "mejora":
+        assert resultado["mejora_ev"] == 1
+        assert resultado["mejora_ev_b"] == 1
+    elif condicion_que_falla == "fuente":
+        assert resultado["fuente_no_baja"] is False
+    else:
+        assert resultado["latencia_anadida_ms"] == 100
+        assert resultado["latencia_ok"] is False
+
+
+def test_hibrida_mas_rapida_que_la_referencia():
+    hibrida = {
+        "ev_aciertos": 24,
+        "aciertos": 30,
+        "ev_aciertos_b": 8,
+        "busqueda_ms": 20,
+    }
+    resultado = ce.evaluar_hibrida(REFERENCIA_HIBRIDA, hibrida, 2, 100)
+    assert resultado["latencia_anadida_ms"] == -10
+    assert resultado["latencia_ok"] is True
+    assert resultado["cumple"] is True
