@@ -1,5 +1,6 @@
 ---
 name: create-pr
+model: haiku
 description: "Único subagente que crea pull requests: la abre contra la rama base, en draft, asignada y con la etiqueta del tipo, sin enlazar la issue. También pide las revisiones que se le indican. Lo llama el orquestador delivery-workflow."
 skills:
   - create-pr-base

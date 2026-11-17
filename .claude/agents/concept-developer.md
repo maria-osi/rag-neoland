@@ -1,5 +1,6 @@
 ---
 name: concept-developer
+model: opus
 description: "Escribe la spec, el plan y las tasks de la tarea en su issue, y la documentación del proyecto que el cambio deje desfasada. No escribe código. Lo llama el orquestador delivery-workflow en el ciclo."
 skills:
   - issue-spec

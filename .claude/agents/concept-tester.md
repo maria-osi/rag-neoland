@@ -1,5 +1,6 @@
 ---
 name: concept-tester
+model: sonnet
 description: "Comprueba que la documentación del proyecto y la spec de la issue dicen lo que el código hace. No edita nada. Lo llama el orquestador delivery-workflow en cada ronda, siempre nuevo."
 skills:
   - issue-spec

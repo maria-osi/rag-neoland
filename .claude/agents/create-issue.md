@@ -1,5 +1,6 @@
 ---
 name: create-issue
+model: haiku
 description: "Deja la tarea escrita como issue en GitHub, con la plantilla y la etiqueta de su tipo y asignada a quien está autenticado. Lo llama el orquestador delivery-workflow."
 skills:
   - create-issue
