@@ -1,7 +1,7 @@
 """Funciones puras (sin red) del notebook 05_comparar_embeddings_bases.
 
 Troceo del corpus (por tamaño fijo y por estructura Markdown), jsonl de chunks, lectura del golden set y de sus evidencias,
-prefijos por modelo, métricas de recuperación y reordenado por reranker con su criterio de decisión.
+prefijos por modelo, métricas de recuperación y reordenado por reranker y búsqueda híbrida, cada una con su criterio de decisión.
 """
 import json
 import re
@@ -409,3 +409,34 @@ def elegir_reranker(
         return filas, None
     ganador = min(cumplen, key=lambda o: (-o["ev_aciertos"], o["latencia_ms"]))
     return filas, ganador["nombre"]
+
+
+def evaluar_hibrida(
+    referencia: dict,
+    hibrida: dict,
+    mejora_minima: int,
+    latencia_anadida_maxima_ms: float,
+) -> dict:
+    """Aplica el criterio de decisión de la búsqueda híbrida sobre aciertos contados.
+
+    Las dos entradas son {"ev_aciertos", "aciertos", "ev_aciertos_b", "busqueda_ms"}: aciertos
+    ev_hit@4, hit@4 por fuente, ev_hit@4 de la categoría B y latencia media de búsqueda.
+    `referencia` es la vectorial con reranking. Cumple si mejora ev_hit@4 en total o en B
+    en al menos `mejora_minima`, no baja el hit@4 por fuente y la latencia añadida
+    es menor que `latencia_anadida_maxima_ms`.
+    """
+    mejora_ev = hibrida["ev_aciertos"] - referencia["ev_aciertos"]
+    mejora_ev_b = hibrida["ev_aciertos_b"] - referencia["ev_aciertos_b"]
+    fuente_no_baja = hibrida["aciertos"] >= referencia["aciertos"]
+    latencia_anadida_ms = hibrida["busqueda_ms"] - referencia["busqueda_ms"]
+    latencia_ok = latencia_anadida_ms < latencia_anadida_maxima_ms
+    return {
+        "mejora_ev": mejora_ev,
+        "mejora_ev_b": mejora_ev_b,
+        "fuente_no_baja": fuente_no_baja,
+        "latencia_anadida_ms": latencia_anadida_ms,
+        "latencia_ok": latencia_ok,
+        "cumple": (mejora_ev >= mejora_minima or mejora_ev_b >= mejora_minima)
+        and fuente_no_baja
+        and latencia_ok,
+    }
