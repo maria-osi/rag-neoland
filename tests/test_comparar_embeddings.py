@@ -115,3 +115,30 @@ def test_prefijos_por_modelo():
     assert ce.preparar_documento("bge", "c") == "c"
     assert ce.preparar_query("nomic", "q") == "search_query: q"
     assert ce.preparar_documento("nomic", "c") == "search_document: c"
+
+
+def test_fuentes_ausentes_avisa_con_id_y_ruta(tmp_path):
+    """CB-03: una fuente que no existe en el corpus se señala con su ID y su ruta."""
+    (tmp_path / "library").mkdir()
+    (tmp_path / "library" / "re.md").write_text("x", encoding="utf-8")
+    preguntas = [
+        {"id": "A1", "fuentes": ["library/re.md"]},
+        {"id": "A2", "fuentes": ["library/no_existe.md"]},
+    ]
+    assert ce.fuentes_ausentes(preguntas, tmp_path) == [("A2", "library/no_existe.md")]
+
+
+def test_fila_invalida_no_cuenta_como_pregunta(tmp_path):
+    """CB-04: una fila sin query o con un ID que no es letra más dígitos se descarta."""
+    copia = tmp_path / "golden.md"
+    lineas = GOLDEN.read_text(encoding="utf-8").splitlines()
+    salida = []
+    for linea in lineas:
+        salida.append(linea)
+        if linea.startswith("| A10 |"):
+            salida.append("| A11 |  | resp | evid | `library/re.html` |")
+            salida.append("| XX | A query? | resp | evid | `library/re.html` |")
+    copia.write_text("\n".join(salida), encoding="utf-8")
+    ids = [p["id"] for p in ce.leer_golden_set(copia)]
+    assert "A11" not in ids and "XX" not in ids
+    assert len(ids) == 35
