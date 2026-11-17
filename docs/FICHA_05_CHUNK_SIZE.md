@@ -1,0 +1,192 @@
+# Ficha de investigación: tamaño de chunk
+
+> Ficha de la pregunta 5 de [TAREA_RAG_A_TEMPO.md](TAREA_RAG_A_TEMPO.md), con la estructura de [PLANTILLA_FICHA_INVESTIGACION.md](PLANTILLA_FICHA_INVESTIGACION.md). Issue [#7](https://github.com/maria-osi/rag-neoland/issues/7). Parte del modelo elegido en la [ficha 1](FICHA_01_EMBEDDINGS.md).
+
+| Campo | Valor |
+|---|---|
+| Autores | Maria (persona A: indexación) |
+| Fecha | 2026-11-17 |
+| Versión | v1 |
+| Estado | borrador |
+| Pregunta nº | 5 |
+
+## Resumen (máx. 150 palabras)
+
+Se preguntó qué tamaño de chunk recupera mejor la documentación de Python 3.15. Con nomic-embed-text, Qdrant y k=4 se compararon seis troceos: 300, 500, 1000 y 1500 caracteres sin solape, y 500 y 1000 con un 20 % de solape, sobre las 32 preguntas A-D del golden set. Por fuente, todos aciertan parecido (hit@4 entre 0,844 y 0,906). Por evidencia, que es lo que el LLM necesita, el acierto sube con el tamaño a partir de 500: de 0,375 con 500 a 0,563 con 1500 (300 da 0,438), y el MRR por evidencia de 0,271 a 0,422. El solape no compensa: con 500 sube el acierto por evidencia pero baja el de fuente, con 1000 no sube el de evidencia, y añade un 24 % de chunks con 500 y un 23 % con 1000. Se elige 1500 caracteres sin solape, provisional hasta probar tamaños mayores y repetir con reranking.
+
+## 1. Introducción
+
+### 1.1 Contexto y motivación
+
+En la ficha 1, los tres modelos empataron en acierto por evidencia (0,375): el chunk con la respuesta exacta faltaba a menudo entre los 4 primeros aunque el fichero correcto sí apareciera. Eso apunta al troceo, no al modelo. El tamaño del chunk decide cuánto contexto lleva cada resultado y cuántos chunks hay que buscar. Con un corpus que crece de forma controlada, también condiciona el tiempo de indexación y la latencia.
+
+### 1.2 Pregunta de investigación
+
+¿Qué tamaño de chunk (y si conviene solape) maximiza el acierto por evidencia en los 4 primeros resultados sobre el golden set de Python 3.15?
+
+### 1.3 Hipótesis
+
+Los chunks más grandes que 500 caracteres suben el acierto por evidencia, porque la respuesta queda menos veces repartida entre chunks y cada chunk lleva más contexto para el embedding. A partir de cierto tamaño, el ruido de mezclar varios temas en un chunk bajaría el acierto por fuente. El solape debería ayudar a los chunks pequeños, porque evita cortar la evidencia por la mitad.
+
+### 1.4 Alcance y exclusiones
+
+- **Entra:** troceo por caracteres de 300, 500, 1000 y 1500, con y sin solape, sobre nomic-embed-text, Qdrant y k=4.
+- **No entra:** troceo por estructura (secciones Markdown, frases) o por tokens; tamaños mayores de 1500; otros modelos (ficha 1); otros k (ficha 4); reranking (ficha 3); hybrid (ficha 6). No se mide la respuesta final del LLM, solo la recuperación.
+
+## 2. Estado de la cuestión
+
+| Fuente | Qué aporta | Fiabilidad |
+|---|---|---|
+| Documentación de LangChain sobre text splitters (ref. 1) | El troceo por caracteres con solape es la línea base habitual. El solape existe para no perder contexto en los cortes. | oficial |
+| Pinecone, «Chunking strategies» (ref. 2) | No hay un tamaño óptimo universal: depende del contenido, del modelo y de la longitud de las consultas. Recomienda medir sobre el propio corpus. | blog técnico |
+| Nussbaum et al. (ref. 3) y ficha de nomic-embed-text en Ollama (ref. 4) | El modelo se entrenó con un contexto de 8192 tokens. La versión que sirve Ollama declara un `context_length` de 2048 tokens (`ollama show nomic-embed-text`). 1500 caracteres son unos 375 tokens con la estimación habitual de 4 caracteres por token; aunque el código diera 2 caracteres por token, serían 750 tokens, por debajo de 2048. | paper / oficial |
+| Ficha 1 de este proyecto | Con 500 caracteres, el acierto por evidencia es 0,375 en los tres modelos probados. | propia |
+
+Opinión del equipo: la documentación de Python mezcla prosa, firmas de funciones y ejemplos de código. Un párrafo explicativo y su ejemplo suelen sumar más de 500 caracteres, así que un troceo corto los separa.
+
+## 3. Método
+
+### 3.1 Opciones comparadas
+
+| Opción | Tamaño (caracteres) | Solape (caracteres) | Colección en Qdrant |
+|---|---|---|---|
+| A | 300 | 0 | `pydocs_nomic_c300_s0` |
+| B (base) | 500 | 0 | `pydocs_nomic_c500_s0` |
+| C | 1000 | 0 | `pydocs_nomic_c1000_s0` |
+| D | 1500 | 0 | `pydocs_nomic_c1500_s0` |
+| E | 500 | 100 (20 %) | `pydocs_nomic_c500_s100` |
+| F | 1000 | 200 (20 %) | `pydocs_nomic_c1000_s200` |
+
+El troceo es `trocear_corpus(carpeta, tamano, solape)` de `scripts/comparar_embeddings.py`. Corta por caracteres, avanza `tamano - solape` en cada paso y descarta los tramos en blanco.
+
+### 3.2 Datos y preguntas de prueba
+
+- Documentos usados: corpus limpio de Python 3.15, `data/python-docs-3.15/python-3.15-docs-md-clean/` (508 ficheros `.md`, 9,6 MB).
+- Conjunto de preguntas: las 35 del golden set ([GOLDEN_SET_PYTHON_DOCS.md](GOLDEN_SET_PYTHON_DOCS.md)), columna «Query (EN)». Las métricas de acierto usan las 32 de las categorías A-D. Las 3 de la categoría E no tienen respuesta en el corpus y se usan para ver el score del mejor resultado.
+- Respuesta esperada: la fuente (fichero) de cada pregunta en el golden set y la subcadena literal que la contiene en [golden_set_evidencias.json](golden_set_evidencias.json). Las definió el equipo leyendo la documentación.
+
+### 3.3 Variables
+
+- Variable que se cambia: tamaño del chunk y solape.
+- Variables fijas: modelo nomic-embed-text con prefijos `search_query: ` / `search_document: `, Qdrant con distancia coseno, k=4, corpus y golden set.
+- Variables medidas: acierto por fuente y por evidencia, latencia por pregunta, tiempo de indexación, número de chunks, evidencias partidas por el troceo y score del mejor resultado en las preguntas E.
+
+### 3.4 Métricas y criterio de éxito
+
+| Métrica | Cómo se calcula | Umbral para aceptar la opción |
+|---|---|---|
+| hit@1 / hit@4 (fuente) | Proporción de preguntas con un chunk del fichero correcto en la posición 1 / en las 4 primeras | No bajar respecto a la base (500) |
+| MRR@4 (fuente) | Media de 1/posición del primer acierto (0 si no hay) | Referencia |
+| ev_hit@1 / ev_hit@4 | Igual, pero el chunk debe contener la evidencia literal | Criterio principal: el mayor |
+| ev_MRR@4 | MRR con el criterio de evidencia | Desempate |
+| Latencia (ms) | Media por pregunta: embedding de la query más búsqueda | Por debajo de 100 ms |
+| Indexación (s) | Embeddings más inserción, por configuración | Referencia de coste |
+
+No se fijó un umbral numérico de mejora antes de probar; el criterio fue elegir el mayor ev_hit@4 sin perder acierto por fuente respecto a la base.
+
+### 3.5 Entorno y reproducción
+
+- Python y librerías: las de `pyproject.toml` y `uv.lock` (`qdrant-client` 1.20.0, `ollama` 0.6.3, `nbconvert` 7.17.2). Qdrant 1.20 en Docker y Ollama con `nomic-embed-text:latest` en un MacBook M2 Pro de 16 GB.
+- Notebook: [notebooks/06_comparar_tamano_chunk.ipynb](../notebooks/06_comparar_tamano_chunk.ipynb). Para ejecutarlo sin abrir Jupyter: `uv run jupyter nbconvert --to notebook --execute notebooks/06_comparar_tamano_chunk.ipynb --ExecutePreprocessor.timeout=-1`. La indexación de las seis configuraciones suma unos 36 minutos (CSV); si se fija un timeout por celda, tiene que ser mayor que eso.
+- Repeticiones: una ejecución. El troceo y los embeddings son deterministas; la latencia y el tiempo de indexación varían entre ejecuciones.
+
+## 4. Resultados
+
+**Tabla 1. Métricas por configuración (32 preguntas A-D, k=4).** Entre paréntesis, preguntas acertadas.
+
+| Tamaño | Solape | Chunks | hit@1 | hit@4 | MRR | ev_hit@1 | ev_hit@4 | ev_MRR |
+|---|---|---|---|---|---|---|---|---|
+| 300 | 0 | 32 156 | 0,625 | 0,844 (27) | 0,716 | 0,281 | 0,438 (14) | 0,341 |
+| 500 | 0 | 19 393 | 0,656 | 0,906 (29) | 0,755 | 0,219 | 0,375 (12) | 0,271 |
+| 1000 | 0 | 9 816 | 0,625 | 0,906 (29) | 0,753 | 0,313 | 0,500 (16) | 0,378 |
+| **1500** | **0** | **6 639** | **0,719** | **0,906 (29)** | **0,794** | **0,344** | **0,563 (18)** | **0,422** |
+| 500 | 100 | 24 049 | 0,625 | 0,844 (27) | 0,719 | 0,219 | 0,469 (15) | 0,326 |
+| 1000 | 200 | 12 103 | 0,656 | 0,875 (28) | 0,758 | 0,219 | 0,500 (16) | 0,315 |
+
+La fila de 500 sin solape reproduce el resultado de nomic en la ficha 1 (hit@4 0,906 por fuente y 0,375 por evidencia).
+
+**Tabla 2. Coste por configuración.**
+
+| Tamaño | Solape | Latencia media (ms) | Indexación (s) | Evidencias partidas | Score medio del mejor resultado en E |
+|---|---|---|---|---|---|
+| 300 | 0 | 58,5 | 405 | 1 (A08, `library/sqlite3.md`) | 0,652 |
+| 500 | 0 | 42,5 | 298 | 0 | 0,661 |
+| 1000 | 0 | 18,8 | 244 | 0 | 0,644 |
+| 1500 | 0 | 19,8 | 228 | 0 | 0,637 |
+| 500 | 100 | 40,6 | 687 | 0 | 0,663 |
+| 1000 | 200 | 20,0 | 311 | 0 | 0,646 |
+
+**Tabla 3. ev_hit@4 por categoría (acierto por evidencia).**
+
+| Categoría (n) | 300 | 500 | 1000 | 1500 | 500/100 | 1000/200 |
+|---|---|---|---|---|---|---|
+| A, dato concreto (10) | 0,2 | 0,2 | 0,3 | 0,3 | 0,3 | 0,4 |
+| B, explicación (10) | 0,8 | 0,7 | 0,7 | 0,9 | 0,6 | 0,8 |
+| C, código (9) | 0,44 | 0,33 | 0,67 | 0,67 | 0,56 | 0,44 |
+| D, varias fuentes (3) | 0 | 0 | 0 | 0 | 0,33 | 0 |
+
+Fallos y resultados que no siguen la tendencia:
+
+- **Categoría A (dato concreto)** es la más baja en todas las configuraciones: como mucho 4 de 10 por evidencia, aunque por fuente llega a 1,0 con 500. El fichero correcto aparece, pero el chunk con el dato exacto no.
+- **Categoría D (varias fuentes)** casi no acierta por evidencia en ninguna configuración: solo 500/100 acierta una de las tres. Con k=4 no caben las fuentes que piden estas preguntas.
+- **Por fuente, 300 y 500/100 bajan** a 0,844: pierden 2 preguntas respecto a 500 sin solape.
+- **El tiempo de indexación de 500/100 (687 s)** es el mayor, por encima de 300 sin solape, que tiene más chunks. Con una sola ejecución no se puede saber si es un coste real o una variación puntual de Ollama; no se ha medido.
+- **Preguntas E:** el score del mejor resultado está entre 0,61 y 0,67 en todas las configuraciones. No hay un corte que separe estas preguntas de las que sí tienen respuesta.
+
+## 5. Discusión
+
+- **Qué significan los resultados:** el acierto por fuente apenas depende del tamaño: el modelo encuentra el fichero correcto casi siempre. Lo que cambia es si el chunk devuelto contiene la respuesta. Con 1500 caracteres, 18 de 32 preguntas traen la evidencia entre los 4 primeros, frente a 12 con 500. Además el primer resultado acierta más (ev_hit@1 0,344 frente a 0,219), así que el chunk relevante sube de posición.
+- **Frente a la hipótesis:** se confirma la primera parte: los chunks grandes suben el acierto por evidencia. No aparece la caída por ruido hasta 1500; el acierto por fuente se mantiene en 0,906. La parte del solape se confirma solo a medias: 500/100 mejora a 500 sin solape por evidencia (15 frente a 12) pero pierde 2 preguntas por fuente (hit@4 0,844 frente a 0,906). 1000/200 empata con 1000 sin solape por evidencia (16 preguntas), pierde 1 pregunta en hit@4 y baja el ev_MRR (0,315 frente a 0,378); solo sube un poco el hit@1 (0,656 frente a 0,625) y el MRR (0,758 frente a 0,753).
+- **Explicaciones alternativas:** con chunks grandes hay menos chunks en total (6 639 frente a 19 393), así que acertar entre 4 es más fácil por pura probabilidad. Las evidencias son subcadenas cortas: un chunk más largo tiene más papeletas de contenerlas aunque el resto del texto no sea relevante. Parte de la mejora puede deberse a eso y no a un mejor embedding.
+- **Limitaciones y amenazas a la validez:**
+  - Son 32 preguntas: la diferencia entre 1000 y 1500 es de 2 preguntas, dentro del ruido. Entre 500 y 1500 son 6 preguntas, una diferencia más sólida.
+  - Hay una sola ejecución; la latencia y la indexación cambian entre ejecuciones (ver 500/100).
+  - No se probaron tamaños mayores de 1500, así que no sabemos dónde empieza la caída.
+  - El orden de los modelos de la ficha 1 se midió con 500; no está comprobado que nomic siga siendo el mejor con 1500.
+  - No se mide si el LLM responde bien. Un chunk de 1500 caracteres mete más texto irrelevante en el prompt; con k=4 son unos 6 000 caracteres (unos 1 500 tokens) por pregunta. La prueba previa de [TAREA_RAG_A_TEMPO.md](TAREA_RAG_A_TEMPO.md) (pregunta 5) vio que, con chunks de 1000, una pregunta acabó en «No encuentro esa información». Fue una sola pregunta y otra configuración, pero avisa de que más recuperación no garantiza mejor respuesta.
+  - La categoría D tiene solo 3 preguntas.
+- **Qué cambiaría si el volumen de datos creciera:** chunks más grandes significan menos vectores. Con 1500 caracteres el índice tiene un tercio de los chunks de 500, la indexación es un 23 % más rápida y la búsqueda tarda la mitad (20 ms frente a 42 ms). Si el corpus crece, esta opción escala mejor en almacenamiento y en tiempo.
+
+## 6. Conclusión y decisión
+
+| Campo | Contenido |
+|---|---|
+| Decisión | Chunks de 1500 caracteres sin solape (colección `pydocs_nomic_c1500_s0`), de forma provisional. |
+| Motivo principal | Es la configuración con más acierto por evidencia (ev_hit@4 0,563, frente a 0,375 de la base de 500) sin perder acierto por fuente (0,906). |
+| Alternativas descartadas | 300 y 500: menos acierto por evidencia que 1500 (0,438 y 0,375 frente a 0,563). 1000: muy cerca, queda como alternativa si el prompt al LLM resulta demasiado largo. Con solape: 500/100 baja el acierto por fuente y 1000/200 no sube el de evidencia, y añaden un 24 % (500/100) y un 23 % (1000/200) más de chunks y más tiempo de indexación. |
+| Coste o riesgo asumido | Más texto por resultado en el prompt (unos 1 500 tokens con k=4). Riesgo de que tamaños mayores sean aún mejores y no los hayamos medido. |
+| Cuándo se revisa | Al cerrar las fichas 3 (reranking) y 4 (k), que se miden ya sobre esta colección; si el LLM da respuestas peores con chunks largos; o si se prueba un troceo por secciones Markdown. Conviene una prueba corta con 2000 caracteres y repetir la ficha 1 con 1500. |
+
+## 7. Impacto en el workflow
+
+- El paso «el agente consulta el RAG» busca en la colección `pydocs_nomic_c1500_s0` de Qdrant, con el prefijo `search_query: ` de nomic.
+- La indexación usa `trocear_corpus(carpeta, tamano=1500, solape=0)`.
+- Las fichas 3, 4 y 6 parten de esta configuración en vez de la base de 500.
+- El prompt del agente tiene que admitir unos 6 000 caracteres de contexto con k=4.
+
+## 8. Referencias
+
+1. LangChain. (s. f.). _Text splitters_. LangChain Docs. https://python.langchain.com/docs/concepts/text_splitters/ (consultado el _AAAA-MM-DD_).
+2. Pinecone. (s. f.). _Chunking strategies for LLM applications_. Pinecone Learn. https://www.pinecone.io/learn/chunking-strategies/ (consultado el _AAAA-MM-DD_).
+3. Nussbaum, Z., Morris, J. X., Duderstadt, B. y Mulyar, A. (2024). _Nomic Embed: Training a reproducible long context text embedder_. arXiv. https://arxiv.org/abs/2402.01613 (consultado el _AAAA-MM-DD_).
+4. Ollama. (s. f.). _nomic-embed-text_. Ollama Library. https://ollama.com/library/nomic-embed-text (consultado el _AAAA-MM-DD_).
+
+## Anexos
+
+- Notebook: [notebooks/06_comparar_tamano_chunk.ipynb](../notebooks/06_comparar_tamano_chunk.ipynb)
+- Datos brutos: `data/resultados/tamano_chunk.csv`
+- Troceo: `trocear_corpus` en [scripts/comparar_embeddings.py](../scripts/comparar_embeddings.py)
+
+---
+
+## Lista de comprobación antes de exponer
+
+- [x] La pregunta está formulada en una frase y se puede responder con datos.
+- [ ] La hipótesis y el umbral de éxito se escribieron antes de probar. _La hipótesis sí; no hubo umbral numérico, solo «el mayor ev_hit@4 sin perder acierto por fuente»._
+- [x] Solo cambia una variable a la vez; el resto está fijo.
+- [x] Otra persona puede repetir la prueba con la sección 3.
+- [x] Los resultados incluyen lo que no salió como se esperaba.
+- [x] La conclusión no afirma más de lo que muestran los datos.
+- [x] Las limitaciones están dichas con claridad.
+- [ ] Toda afirmación externa tiene su referencia. _Faltan las fechas de consulta._
+- [x] El resumen se entiende sin leer el resto.

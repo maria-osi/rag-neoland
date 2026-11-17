@@ -1,6 +1,8 @@
-"""Tests de scripts/comparar_embeddings.py (escenarios 1-8 de la issue #5)."""
+"""Tests de scripts/comparar_embeddings.py (escenarios 1-8 de la issue #5 y 1-5 de la #7)."""
 import shutil
 from pathlib import Path
+
+import pytest
 
 import comparar_embeddings as ce
 
@@ -142,3 +144,63 @@ def test_fila_invalida_no_cuenta_como_pregunta(tmp_path):
     ids = [p["id"] for p in ce.leer_golden_set(copia)]
     assert "A11" not in ids and "XX" not in ids
     assert len(ids) == 35
+
+
+def _texto_distinto(n: int) -> str:
+    """Texto de n caracteres en el que cada posición se puede identificar."""
+    return "".join(chr(0x4E00 + i) for i in range(n))
+
+
+def test_trocea_con_solape(tmp_path):
+    texto = _texto_distinto(1200)
+    (tmp_path / "a.md").write_text(texto, encoding="utf-8")
+    chunks = ce.trocear_corpus(tmp_path, 500, 100)
+    assert [c["texto"] for c in chunks] == [texto[0:500], texto[400:900], texto[800:1200]]
+    assert [len(c["texto"]) for c in chunks] == [500, 500, 400]
+    for anterior, siguiente in zip(chunks, chunks[1:]):
+        assert anterior["texto"][-100:] == siguiente["texto"][:100]
+
+
+def test_solape_sin_tramo_final_redundante(tmp_path):
+    texto = _texto_distinto(900)
+    (tmp_path / "a.md").write_text(texto, encoding="utf-8")
+    chunks = ce.trocear_corpus(tmp_path, 500, 100)
+    assert [c["texto"] for c in chunks] == [texto[0:500], texto[400:900]]
+
+
+def test_solape_ids_consecutivos_varios_ficheros(tmp_path):
+    (tmp_path / "a.md").write_text(_texto_distinto(1200), encoding="utf-8")
+    (tmp_path / "b.md").write_text(_texto_distinto(900), encoding="utf-8")
+    chunks = ce.trocear_corpus(tmp_path, 500, 100)
+    assert [c["id"] for c in chunks] == list(range(len(chunks)))
+    assert [c["fuente"] for c in chunks] == ["a.md"] * 3 + ["b.md"] * 2
+
+
+def test_solape_no_parte_mas_evidencias():
+    evidencias = ce.leer_evidencias(EVIDENCIAS)
+    fuentes = {f for d in evidencias.values() for f in d}
+    sin_solape = [c for c in ce.trocear_corpus(CORPUS, 500) if c["fuente"] in fuentes]
+    con_solape = [c for c in ce.trocear_corpus(CORPUS, 500, 100) if c["fuente"] in fuentes]
+    assert len(ce.evidencias_fuera_de_chunks(evidencias, con_solape)) <= len(
+        ce.evidencias_fuera_de_chunks(evidencias, sin_solape)
+    )
+
+
+@pytest.mark.parametrize("tamano, solape", [(500, -1), (500, 500), (500, 600), (0, 0), (-5, 0)])
+def test_solape_o_tamano_invalidos(tmp_path, tamano, solape):
+    (tmp_path / "a.md").write_text("x" * 1200, encoding="utf-8")
+    with pytest.raises(ValueError) as error:
+        ce.trocear_corpus(tmp_path, tamano, solape)
+    assert str(solape if tamano > 0 else tamano) in str(error.value)
+
+
+def test_solape_descarta_tramos_en_blanco(tmp_path):
+    texto = "x" * 400 + " " * 400 + "y" * 400
+    (tmp_path / "a.md").write_text(texto, encoding="utf-8")
+    chunks = ce.trocear_corpus(tmp_path, 500, 100)
+    assert [c["texto"] for c in chunks] == [texto[0:500], texto[400:900], texto[800:1200]]
+    (tmp_path / "a.md").write_text("x" * 400 + " " * 1000 + "y" * 400, encoding="utf-8")
+    chunks = ce.trocear_corpus(tmp_path, 500, 100)
+    assert all(c["texto"].strip() for c in chunks)
+    assert [c["id"] for c in chunks] == list(range(len(chunks)))
+    assert len(chunks) == 3  # inicios 0, 400, 800, 1200, 1600: los de 400 y 800 son blancos
