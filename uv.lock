@@ -978,6 +978,27 @@ wheels = [
 ]
 
 [[package]]
+name = "fastembed"
+version = "0.9.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "loguru" },
+    { name = "mmh3" },
+    { name = "numpy" },
+    { name = "onnxruntime" },
+    { name = "pillow" },
+    { name = "py-rust-stemmers" },
+    { name = "requests" },
+    { name = "tokenizers" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/36/e5faec3c37878a22216241f32e375a754fb519db4564fefd1ba0e9135547/fastembed-0.9.1.tar.gz", hash = "sha256:8b4b2881ea85a4d36e8f284466671437b3fed869c33cdc71d6f6c48ddff115c7", size = 106290, upload-time = "2026-10-24T18:23:46.233Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/9f/04650110be2c2554655e8b2c216567e6028cc767a2a0ad26f84972829c60/fastembed-0.9.1-py3-none-any.whl", hash = "sha256:95042ac7f685bda6697861066d49f8b119fbde8b75ed5162bbb7e84e2dad0e1d", size = 150228, upload-time = "2026-10-24T18:23:45.012Z" },
+]
+
+[[package]]
 name = "fastjsonschema"
 version = "2.22.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1443,22 +1464,22 @@ wheels = [
 
 [[package]]
 name = "huggingface-hub"
-version = "2.3.0"
+version = "1.33.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "filelock" },
     { name = "fsspec" },
-    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'ARM64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'" },
-    { name = "httpx2" },
+    { name = "hf-xet", marker = "platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'" },
+    { name = "httpx" },
     { name = "packaging" },
     { name = "pyyaml" },
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/46/dd/585639d95f6a987c0bdfb9045f050f4ad67240775644ba7a4fdc5aca3a3b/huggingface_hub-2.3.0.tar.gz", hash = "sha256:0b783b37f200f1d25bef2344a997c7d410f4437fbe9d8fd965f958e75cec7aef", size = 1063410, upload-time = "2026-10-23T08:52:06.594Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/2a/484d112c0d8fc5f665d7b65137ac9cdb2953c982391598c3597968a12ee7/huggingface_hub-1.33.0.tar.gz", hash = "sha256:367be21a201db9523eddf8aeac7048f2602c1b308691c97640d5e72ed188007e", size = 1043548, upload-time = "2026-09-24T09:49:29.971Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c7/89/5f6ef1162d0323f167b6baab04d1b4bd6a946161a8af6d86f622d9d79aa1/huggingface_hub-2.3.0-py3-none-any.whl", hash = "sha256:5da369600233568a126eb5578754935b2add9446b42d9e2fc0927d56840ac1a5", size = 855161, upload-time = "2026-10-23T08:52:04.78Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/16/963096d224b80909432dc16561a615fd33d2d13beef3ce4c63fa25e40867/huggingface_hub-1.33.0-py3-none-any.whl", hash = "sha256:04e434b06e100eddbce9a6e817d72693a7884b10a79bd67ab48080d5c07eb899", size = 846435, upload-time = "2026-09-24T09:49:28.059Z" },
 ]
 
 [[package]]
@@ -1486,6 +1507,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e4/06/b56dfa750b44e86157093bc8fca0ab81dccbf5260510de4eaf1cb69b5b99/importlib_resources-7.1.0.tar.gz", hash = "sha256:0722d4c6212489c530f2a145a34c0a7a3b4721bc96a15fada5930e2a0b760708", size = 44985, upload-time = "2026-04-12T16:36:09.232Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8a/db/55a262f3606bebcae07cc14095338471ad7c0bbcaa37707e6f0ee49725b7/importlib_resources-7.1.0-py3-none-any.whl", hash = "sha256:1bd7b48b4088eddb2cd16382150bb515af0bd2c70128194392725f82ad2c96a1", size = 37232, upload-time = "2026-04-12T16:36:08.219Z" },
+]
+
+[[package]]
+name = "iniconfig"
+version = "2.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
 ]
 
 [[package]]
@@ -2365,6 +2395,19 @@ wheels = [
 ]
 
 [[package]]
+name = "loguru"
+version = "0.7.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "win32-setctime", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3a/05/a1dae3dffd1116099471c643b8924f5aa6524411dc6c63fdae648c4f1aca/loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6", size = 63559, upload-time = "2024-12-06T11:20:56.608Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/29/0348de65b8cc732daa3e33e67806420b2ae89bdce2b04af740289c5c6c8c/loguru-0.7.3-py3-none-any.whl", hash = "sha256:31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c", size = 61595, upload-time = "2024-12-06T11:20:54.538Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3112,6 +3155,19 @@ wheels = [
 ]
 
 [[package]]
+name = "ollama"
+version = "0.6.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b8/97/eeafe65594e4f4b25e443e068ef7d83aa3105b023e12e1c408c38669fc07/ollama-0.6.3.tar.gz", hash = "sha256:41fc49a8095c4a75939c4c1f8582e4d0671692fb6eac2a5a7ede8c9872b67096", size = 56868, upload-time = "2026-09-29T01:26:51.906Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4d/64/87505d9e006461233c21c8e66dc1ecee49c996090584b216abd0dd4a8322/ollama-0.6.3-py3-none-any.whl", hash = "sha256:6a20bc42c1a5f889295d7ec490d35e5132fc31f339561530f43a8abd4dbfe508", size = 16603, upload-time = "2026-09-29T01:26:50.451Z" },
+]
+
+[[package]]
 name = "onnxruntime"
 version = "1.31.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3455,6 +3511,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pluggy"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
+]
+
+[[package]]
 name = "portalocker"
 version = "4.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -3614,6 +3679,24 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/da/9f/abfd2959e9261dd5217ca8551d4de211ca6ab26fe9b72cf44731ff6c4442/pure_eval-0.2.4.tar.gz", hash = "sha256:260c2774686e651b79f8b8e7fc9d80b3599ea6a66334b47d5f4abb69fc2c0ea1", size = 20563, upload-time = "2026-09-10T21:41:22.836Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/18/83376915176eb058cb86470eb7396388a13350b09a8f233a79303bbcbc5b/pure_eval-0.2.4-py3-none-any.whl", hash = "sha256:96cae060a313cfaad51bb761278bfb0e62dc0248d9315a81173752dc546cd37a", size = 11893, upload-time = "2026-09-10T21:41:21.532Z" },
+]
+
+[[package]]
+name = "py-rust-stemmers"
+version = "0.1.8"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/c1/9763f9fb1cd73f9c317a83feeed6e0d4af320c6bbddab47b4a94f3a47d0c/py_rust_stemmers-0.1.8.tar.gz", hash = "sha256:6b0f6f48bc54d607aed802de872fcd5a71bae969a6760976dc78ce55e8eaf3da", size = 9732, upload-time = "2026-05-22T11:00:24.358Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b0/7e/f4346adfd44acbd7eaedcbd7d21b7f40ec9712e6c699e71fddad8dae6f8d/py_rust_stemmers-0.1.8-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:526b58958c6ffa36c4a805326cfb624ecbd665d16ba435027dbed0bcbcaa09d2", size = 290379, upload-time = "2026-05-22T11:00:08.192Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/d8/988fc3f5dc0dbbd4bf5909f50ff953ab55ee8b5f79a835d00e57847d3123/py_rust_stemmers-0.1.8-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:2b607f0b270951fb66479baf4b68716cc63a981585cbd898b0b6b5c359efde7e", size = 275458, upload-time = "2026-05-22T11:00:09.522Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/94/e04c8b6a8364bca1b368785cef143755dd2d1ffe74df8f8b47b075bb1043/py_rust_stemmers-0.1.8-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8b0327b151ab8a338fb54fdac114ba34394327fc1e2c4c425ad1caf2013e5de3", size = 314711, upload-time = "2026-05-22T11:00:10.878Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/cb/f59f9a80caa099cb6625a46c9a8e6e7e80bb3ed284f17e80245c8240a66e/py_rust_stemmers-0.1.8-cp314-cp314-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:dadd0e369703817fc7026987b3093f461f9f58d8dde74e689d546184bc8f3451", size = 319370, upload-time = "2026-05-22T11:00:11.961Z" },
+    { url = "https://files.pythonhosted.org/packages/06/59/8211cd0f56e53f7770debd9a78de37985fb5662ae66e3b7b380f4c79888b/py_rust_stemmers-0.1.8-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:245e2c61c52e073341893a9682cd1396b61047154548aee30bb1af3d8ed4b4cc", size = 321373, upload-time = "2026-05-22T11:00:13.213Z" },
+    { url = "https://files.pythonhosted.org/packages/10/72/fe33e614c114264d1ba54d39da4b5a4abeb6aedd0d26e5a8fd0637d6ddba/py_rust_stemmers-0.1.8-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:451ee1c02a3f5cf1e161b46ba9032cdda4ba10a8b03ff9ee61c1d34d42a0bc81", size = 321707, upload-time = "2026-05-22T11:00:14.177Z" },
+    { url = "https://files.pythonhosted.org/packages/91/f9/3cd18902fe2fa54557d3fe9132552256372d381c7aca71346163055d78b1/py_rust_stemmers-0.1.8-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:d396dd25c473c1bc4248c79cd223f4b36356b55a124652f015c6a001547f81ac", size = 492457, upload-time = "2026-05-22T11:00:15.245Z" },
+    { url = "https://files.pythonhosted.org/packages/90/d7/32c6d3995e7036b73683389de2771f4dbbf40de192b7efe73c2528ee1eb5/py_rust_stemmers-0.1.8-cp314-cp314-musllinux_1_2_armv7l.whl", hash = "sha256:479c77c32d8be692f3cfcde7e19273f02ac81d6f45c6aef49887ef95cab7abbb", size = 596085, upload-time = "2026-05-22T11:00:16.404Z" },
+    { url = "https://files.pythonhosted.org/packages/00/8c/e68fa5d862ea6a27fced3535c25ea4eaa26ba1ce00dfef5841924c74b167/py_rust_stemmers-0.1.8-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:c786235275c5c2abb7f206b8236aee3ca0bc53c7497daf7fb7b01d3491469547", size = 539747, upload-time = "2026-05-22T11:00:17.414Z" },
+    { url = "https://files.pythonhosted.org/packages/44/48/aa584cf3772e01231641c95dc1aa73327a7d986c562639d78d0013733acf/py_rust_stemmers-0.1.8-cp314-cp314-win_amd64.whl", hash = "sha256:931d13570962b093417e5443a9d1bd63d73fa239ebb81e5b1d346663571403e4", size = 209636, upload-time = "2026-05-22T11:00:18.662Z" },
 ]
 
 [[package]]
@@ -3905,6 +3988,22 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest"
+version = "9.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/79/42/bb4641652e58dedeac2ec51abc1f8cae4fee4ec63899a0999016229a0f2a/pytest-9.2.0.tar.gz", hash = "sha256:97c4f3b1f3c7414aa36465e09b8220f1d03627993bd51b1282e193753c80557b", size = 1797555, upload-time = "2026-10-27T21:30:20.728Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/39/1f5d8c8877a0fa327db959c19341d4be61660de1ab6b7391f9eb805bcd67/pytest-9.2.0-py3-none-any.whl", hash = "sha256:07acdcf88ec174f907dc01af70bf52d49b014bbab03faeeade31c96b18c2e588", size = 411776, upload-time = "2026-10-27T21:30:19.131Z" },
+]
+
+[[package]]
 name = "python-dateutil"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4050,6 +4149,7 @@ dependencies = [
     { name = "chromadb" },
     { name = "cohere" },
     { name = "datasets" },
+    { name = "fastembed" },
     { name = "ipykernel" },
     { name = "jupyter" },
     { name = "langchain" },
@@ -4060,6 +4160,7 @@ dependencies = [
     { name = "llama-index-embeddings-openai" },
     { name = "llama-index-llms-openai" },
     { name = "matplotlib" },
+    { name = "ollama" },
     { name = "openai" },
     { name = "pypdf" },
     { name = "python-dotenv" },
@@ -4068,12 +4169,18 @@ dependencies = [
     { name = "sentence-transformers" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=2.3.0" },
     { name = "chromadb", specifier = ">=1.5.9" },
     { name = "cohere", specifier = ">=7.3.0" },
     { name = "datasets", specifier = ">=5.1.0" },
+    { name = "fastembed", specifier = ">=0.9.1" },
     { name = "ipykernel", specifier = ">=7.4.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "langchain", specifier = ">=1.4.7" },
@@ -4084,6 +4191,7 @@ requires-dist = [
     { name = "llama-index-embeddings-openai", specifier = ">=0.8.0" },
     { name = "llama-index-llms-openai", specifier = ">=0.9.0" },
     { name = "matplotlib", specifier = ">=3.11.2" },
+    { name = "ollama", specifier = ">=0.6.3" },
     { name = "openai", specifier = ">=3.40.0" },
     { name = "pypdf", specifier = ">=7.1.0" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
@@ -4091,6 +4199,9 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.9.1" },
     { name = "sentence-transformers", specifier = ">=6.2.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.2.0" }]
 
 [[package]]
 name = "referencing"
@@ -5262,6 +5373,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bf/60/bc7a980fc78837d6ef8f5940cca4cadc433364503a4c4d42e2a7a0de3231/widgetsnbextension-4.0.16.tar.gz", hash = "sha256:adeea0ae78f0856ee4945f413299801b82a0a01416303301f39a704282a37b73", size = 1111094, upload-time = "2026-08-18T08:52:55.859Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/34/95/40e17e20046b7bc820d29d09ae84ec157ec8dd6e6f6cd722626292c31b2e/widgetsnbextension-4.0.16-py3-none-any.whl", hash = "sha256:a31a8774885b96fe825462f5d6496166f0c7cae111195b6465c801d230eb5a4e", size = 2225148, upload-time = "2026-08-18T08:52:53.736Z" },
+]
+
+[[package]]
+name = "win32-setctime"
+version = "1.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/e4/f0f252c65f9bf7c4042b1f707ef338d49f799da582234e1d3e6e2cfca291/win32_setctime-1.2.1.tar.gz", hash = "sha256:077b35471bf1ff1d71e165c919ddc0cecf51b8e1802f5d820d33a96e2f6717dd", size = 4983, upload-time = "2026-10-25T18:21:32.318Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/df/5593480bc1e932eeae28e4fa182ab68174edd0d77409ced3b6491d02d1d5/win32_setctime-1.2.1-py3-none-any.whl", hash = "sha256:a9edc685b35414bec69392c866ed82456ad125ac4a6a4b703ec1d8b462d4f477", size = 4215, upload-time = "2026-10-25T18:21:30.939Z" },
 ]
 
 [[package]]
