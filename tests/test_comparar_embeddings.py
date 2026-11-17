@@ -326,3 +326,34 @@ def test_estructura_casos_de_borde(tmp_path):
     assert len(abierto) == 1 and abierto[0]["ruta_titulos"] == "T"
     previo = [c for c in chunks if c["fuente"] == "previo.md"]
     assert previo[0]["ruta_titulos"] == ""
+
+
+# --- Issue #9: número de k ---
+
+
+def test_k_minimo_del_golden_set_real():
+    assert ce.leer_k_minimo(GOLDEN) == {"A": "1", "C": "1-2", "D": "2"}
+
+
+def test_k_minimo_sin_declarar(tmp_path):
+    ruta = tmp_path / "golden.md"
+    ruta.write_text(
+        "## A. Consulta puntual\n\n## B. Términos exactos\n\n## E. Sin respuesta\n",
+        encoding="utf-8",
+    )
+    assert ce.leer_k_minimo(ruta) == {}
+
+
+@pytest.mark.parametrize(
+    "k, hit1, hit_k, mrr",
+    [
+        (1, 1 / 4, 1 / 4, 1 / 4),
+        (2, 1 / 4, 2 / 4, (1 + 1 / 2) / 4),
+        (8, 1 / 4, 3 / 4, (1 + 1 / 2 + 1 / 5) / 4),
+    ],
+)
+def test_metricas_con_k_distinto_de_4(k, hit1, hit_k, mrr):
+    m = ce.calcular_metricas([1, 2, 5, None], k=k)
+    assert m["hit@1"] == pytest.approx(hit1)
+    assert m[f"hit@{k}"] == pytest.approx(hit_k)
+    assert m["mrr"] == pytest.approx(mrr)

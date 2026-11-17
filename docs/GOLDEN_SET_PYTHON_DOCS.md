@@ -29,7 +29,7 @@ Columnas de las tablas:
 - **Evidencia:** texto o dato concreto que debe aparecer en el chunk recuperado.
 - **Fuente** o **Fuentes:** fichero donde está la respuesta, con la ruta descrita en «Corpus». La categoría E no la tiene.
 
-El título de las categorías A, C y D indica el **k mín.**, el k que debería bastar. Sirve para la pregunta 4 de la tarea (1 o 2 resultados).
+El título de las categorías A, C y D indica el **k mín.**, el k que debería bastar, con el formato «(k mín. N)». `leer_k_minimo` de `scripts/comparar_embeddings.py` lo lee de esos títulos y conserva N como texto («1-2»); `notebooks/08_comparar_numero_k.ipynb` lo pone junto al acierto de cada k para la pregunta 4 de la tarea. Una categoría sin «(k mín. …)» en el título aparece como «sin declarar». El resultado está en la [ficha 4](FICHA_04_NUMERO_K.md).
 
 Todas las respuestas esperadas se han comprobado contra el texto de la documentación descargada.
 

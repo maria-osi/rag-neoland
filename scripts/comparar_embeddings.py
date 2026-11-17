@@ -32,6 +32,7 @@ MODELOS: dict[str, dict] = {
 _ID_PREGUNTA = re.compile(r"^[A-Za-z]\d+$")
 _RUTA = re.compile(r"`([^`]+)`")
 _ENCABEZADO = re.compile(r"^(#{1,4}) (.*)$")
+_CATEGORIA_K_MIN = re.compile(r"^##\s+([A-Za-z])\.\s.*\(k mín\.\s*([^)]+?)\s*\)\s*$")
 
 
 def trocear_corpus(carpeta: Path, tamano: int = 500, solape: int = 0) -> list[dict]:
@@ -286,6 +287,19 @@ def fuentes_ausentes(preguntas: list[dict], carpeta: Path) -> list[tuple[str, st
         for fuente in p["fuentes"]
         if not (carpeta / fuente).is_file()
     ]
+
+
+def leer_k_minimo(ruta: Path) -> dict[str, str]:
+    """Lee el «k mín.» de los títulos de categoría `## X. … (k mín. N)`: {letra: texto de N}.
+
+    El valor se conserva como texto («1-2»). Las categorías sin «k mín.» no aparecen.
+    """
+    resultado: dict[str, str] = {}
+    for linea in Path(ruta).read_text(encoding="utf-8").splitlines():
+        m = _CATEGORIA_K_MIN.match(linea.rstrip())
+        if m:
+            resultado[m.group(1)] = m.group(2)
+    return resultado
 
 
 def leer_evidencias(ruta: Path) -> dict[str, dict[str, str]]:
