@@ -23,10 +23,14 @@ Instalado con `apm` (versión fijada en `apm.yml`). Los agentes y skills viven e
 
 - **Punto de entrada:** `/delivery-workflow` y pedir la tarea con palabras normales. Comprobar el entorno: `/check-status`.
 - **Token:** `GITHUB_TOKEN` en `.env` (clásico, permiso `repo`). Nunca lo muestres ni lo subas.
-- **Rama base:** `main` (no existe `staging`). Las ramas se llaman `número-tipo-descripcion`.
+- **Ramas:** el trabajo pasa por tres niveles:
+  1. **Rama de trabajo** `número-tipo-descripcion`, creada desde `staging`.
+  2. **`staging`** (rama base): las pull requests de las tareas se abren contra ella. Los scripts del paquete la detectan solos porque existe en `origin`.
+  3. **`main`**: recibe `staging` con una pull request `staging` → `main` cuando lo integrado está probado.
+- Antes de crear una rama de trabajo, `staging` tiene que estar al día con `main`.
 - **Tipos de tarea:** los que define la skill `create-issue` (mira sus plantillas en `.claude/skills/create-issue/assets/`).
 - **Títulos de issue y commits en inglés; el resto, en español.**
-- **Nunca hagas merge** a `main`: lo hace la persona.
+- **Nunca hagas merge** a `staging` ni a `main`: los dos los hace la persona.
 - **Actualizar el paquete:** cambia la versión en `apm.yml`, `apm install` y commit. Después de cada `apm install`, ejecuta `/configure-models`.
 
 ### Modo por defecto: flujo completo
