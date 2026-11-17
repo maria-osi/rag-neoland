@@ -68,14 +68,37 @@ Ficha: [FICHA_02_BASE_VECTORIAL.md](FICHA_02_BASE_VECTORIAL.md).
 
 ### 3.3 Troceo
 
-Primero se compararon tamaños fijos y solapes; después, troceo por estructura Markdown.
+Se midieron 18 configuraciones en tres pruebas: tamaños fijos con y sin solape, troceo por estructura Markdown y troceo por estructura con límite duro. Todas usan nomic-embed-text, Qdrant y k=4. Entre paréntesis, preguntas acertadas de 32.
 
-| Configuración finalista | hit@4 | ev_hit@4 | ev_MRR | Lectura |
-|---|---:|---:|---:|---|
-| Fijo 1500, sin solape | 0,906 | 0,563 | 0,422 | Mejor tamaño fijo, pero corta secciones por posición. |
-| **Estructura 1500/200, sin ruta** | **0,906** | **0,594** | **0,477** | Mantiene fuentes y mejora evidencia y orden. |
+Tamaño fijo y estructura, sin reranker y con una sola evidencia por fuente:
 
-**Decisión:** estructura 1500/200 sin ruta. Los encabezados delimitan unidades semánticas mejor que un número fijo de caracteres. Incluir la ruta de títulos en el embedding no compensó.
+| Configuración | Chunks | hit@4 | ev_hit@4 | ev_MRR |
+|---|---:|---:|---:|---:|
+| Fijo 300, sin solape | 32 156 | 0,844 (27) | 0,438 (14) | 0,341 |
+| Fijo 500, sin solape | 19 393 | 0,906 (29) | 0,375 (12) | 0,271 |
+| Fijo 1000, sin solape | 9 816 | 0,906 (29) | 0,500 (16) | 0,378 |
+| Fijo 1500, sin solape | 6 639 | 0,906 (29) | 0,563 (18) | 0,422 |
+| Fijo 500, solape 100 | 24 049 | 0,844 (27) | 0,469 (15) | 0,326 |
+| Fijo 1000, solape 200 | 12 103 | 0,875 (28) | 0,500 (16) | 0,315 |
+| Estructura 1500/200, con ruta | 7 955 | 0,875 (28) | 0,594 (19) | 0,477 |
+| **Estructura 1500/200, sin ruta** | **7 955** | **0,906 (29)** | **0,594 (19)** | **0,477** |
+| Estructura 1000/200, con ruta | 10 554 | 0,844 (27) | 0,625 (20) | 0,495 |
+| Estructura 1000/200, sin ruta | 10 554 | 0,844 (27) | 0,563 (18) | 0,487 |
+
+Estructura 1500/200 (actual) frente a estructura con límite duro 1500/200 (limitado), con la métrica de varias evidencias por fuente de la issue #21, así que sus cifras por evidencia no son comparables con las de la tabla anterior:
+
+| Troceo | Ruta | Reranker | Chunks | hit@4 | ev_hit@4 | ev_MRR |
+|---|---|---|---:|---:|---:|---:|
+| actual | no | no | 7 955 | 0,906 (29) | 0,656 (21) | 0,529 |
+| **actual** | **no** | **sí** | **7 955** | **0,938 (30)** | **0,813 (26)** | **0,604** |
+| actual | sí | no | 7 955 | 0,875 (28) | 0,656 (21) | 0,555 |
+| actual | sí | sí | 7 955 | 0,938 (30) | 0,781 (25) | 0,599 |
+| limitado | no | no | 9 143 | 0,906 (29) | 0,719 (23) | 0,492 |
+| limitado | no | sí | 9 143 | 0,906 (29) | 0,781 (25) | 0,526 |
+| limitado | sí | no | 9 143 | 0,938 (30) | 0,719 (23) | 0,560 |
+| limitado | sí | sí | 9 143 | 0,906 (29) | 0,781 (25) | 0,531 |
+
+**Decisión:** estructura 1500/200 sin ruta. Frente a fijo 1500 mantiene las fuentes y sube evidencia y orden; incluir la ruta de títulos en el embedding no compensó. El límite duro deja 69 chunks por encima de 1 500 caracteres, todos bloques de código, frente a 773 del troceo actual, y hace que B01 y B08 traigan la evidencia. Con reranker pierde una evidencia (25 frente a 26) y una fuente (29 frente a 30), así que no cumple el criterio fijado antes de medir y no se adopta.
 
 Ficha: [FICHA_05_CHUNK_SIZE.md](FICHA_05_CHUNK_SIZE.md).
 
@@ -132,7 +155,7 @@ El script [validar_rag_final.py](../scripts/validar_rag_final.py) ejecutó las 3
 | Latencia total media, Windows con reranker en CPU | 918,3 ms |
 | Latencia total media de la validación anterior, reranker en MPS | 153,7 ms |
 
-Las métricas por evidencia usan [golden_set_evidencias.json](golden_set_evidencias.json) con varias evidencias por fuente: A04, A06, A10 y C03 aceptan una segunda redacción de la respuesta. Por eso no son comparables con las de la sección 3 ni con las fichas, medidas con una sola evidencia por fuente. Las métricas por fuente reproducen la fila vectorial con reranking del notebook híbrido, lo que confirma que el módulo integrado no cambió la lógica investigada.
+Las métricas por evidencia usan [golden_set_evidencias.json](golden_set_evidencias.json) con varias evidencias por fuente: A04, A06, A10 y C03 aceptan una segunda redacción de la respuesta. Por eso no son comparables con las de la sección 3 ni con las fichas, medidas con una sola evidencia por fuente, salvo la segunda tabla de la sección 3.3 y la sección «Troceo con límite duro» de la ficha 5, que usan la misma métrica. Las métricas por fuente reproducen la fila vectorial con reranking del notebook híbrido, lo que confirma que el módulo integrado no cambió la lógica investigada.
 
 Datos: `data/resultados/validacion_final.csv`.
 
@@ -194,7 +217,7 @@ El reranker separó las tres preguntas E de las A-D en este golden set, pero tre
 - La evidencia literal solo acepta las subcadenas listadas en el json: un chunk correcto con una redacción que no está en la lista cuenta como fallo.
 - No se evaluó la respuesta generada por el LLM, solo la recuperación.
 - La comparación de bases fue local, caliente y solo de lectura; no cubre escrituras, red, réplicas ni fallos.
-- Algunos chunks excepcionales superan el máximo porque un bloque de código indivisible no se corta.
+- La configuración final tiene 773 de 7 955 chunks por encima de 1 500 caracteres; 709 no son un bloque de código y el mayor tiene 203 072. El troceo con límite duro los reduce a 69 bloques de código, pero no se adoptó (sección 3.3).
 - La traducción español → inglés y la respuesta final en español se delegan al agente y no se midieron aquí.
 
 ## 8. Cuándo revisar las decisiones
