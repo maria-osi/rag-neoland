@@ -1,18 +1,18 @@
 # Ficha de investigación: tamaño de chunk
 
-> Ficha de la pregunta 5 de [TAREA_RAG_A_TEMPO.md](TAREA_RAG_A_TEMPO.md), con la estructura de [PLANTILLA_FICHA_INVESTIGACION.md](PLANTILLA_FICHA_INVESTIGACION.md). Issue [#7](https://github.com/maria-osi/rag-neoland/issues/7). Parte del modelo elegido en la [ficha 1](FICHA_01_EMBEDDINGS.md).
+> Ficha de la pregunta 5 de [TAREA_RAG_A_TEMPO.md](TAREA_RAG_A_TEMPO.md), con la estructura de [PLANTILLA_FICHA_INVESTIGACION.md](PLANTILLA_FICHA_INVESTIGACION.md). Issues [#7](https://github.com/maria-osi/rag-neoland/issues/7) (tamaño fijo) y [#11](https://github.com/maria-osi/rag-neoland/issues/11) (troceo por estructura). Parte del modelo elegido en la [ficha 1](FICHA_01_EMBEDDINGS.md).
 
 | Campo | Valor |
 |---|---|
 | Autores | Maria (persona A: indexación) |
 | Fecha | 2026-11-17 |
-| Versión | v1 |
+| Versión | v2 |
 | Estado | borrador |
 | Pregunta nº | 5 |
 
 ## Resumen (máx. 150 palabras)
 
-Se preguntó qué tamaño de chunk recupera mejor la documentación de Python 3.15. Con nomic-embed-text, Qdrant y k=4 se compararon seis troceos: 300, 500, 1000 y 1500 caracteres sin solape, y 500 y 1000 con un 20 % de solape, sobre las 32 preguntas A-D del golden set. Por fuente, todos aciertan parecido (hit@4 entre 0,844 y 0,906). Por evidencia, que es lo que el LLM necesita, el acierto sube con el tamaño a partir de 500: de 0,375 con 500 a 0,563 con 1500 (300 da 0,438), y el MRR por evidencia de 0,271 a 0,422. El solape no compensa: con 500 sube el acierto por evidencia pero baja el de fuente, con 1000 no sube el de evidencia, y añade un 24 % de chunks con 500 y un 23 % con 1000. Se elige 1500 caracteres sin solape, provisional hasta probar tamaños mayores y repetir con reranking.
+Qué troceo recupera mejor la documentación de Python 3.15, con nomic-embed-text, Qdrant, k=4 y las 32 preguntas A-D del golden set. Entre seis troceos de tamaño fijo, el acierto por evidencia sube desde 500 (ev_hit@4 0,375) hasta 1500 (0,563), y el solape no compensa. Después se comparó 1500 fijo con un troceo por encabezados Markdown (máximo 1500 o 1000, mínimo 200, con y sin ruta de títulos). Solo estructura 1500/200 sin ruta cumple el criterio fijado antes de medir: sube ev_hit@4 a 0,594 y ev_MRR de 0,422 a 0,477, en la categoría A pasa de 3 a 5 de 10, mantiene el hit@4 por fuente (0,906) y sus chunks son más cortos de media (1 203 frente a 1 441 caracteres). Se elige esa configuración, provisional: la ventaja global es de una pregunta y 71 chunks pasan de 6 000 caracteres; los más largos se embeben solo por su comienzo.
 
 ## 1. Introducción
 
@@ -30,8 +30,8 @@ Los chunks más grandes que 500 caracteres suben el acierto por evidencia, porqu
 
 ### 1.4 Alcance y exclusiones
 
-- **Entra:** troceo por caracteres de 300, 500, 1000 y 1500, con y sin solape, sobre nomic-embed-text, Qdrant y k=4.
-- **No entra:** troceo por estructura (secciones Markdown, frases) o por tokens; tamaños mayores de 1500; otros modelos (ficha 1); otros k (ficha 4); reranking (ficha 3); hybrid (ficha 6). No se mide la respuesta final del LLM, solo la recuperación.
+- **Entra:** troceo por caracteres de 300, 500, 1000 y 1500, con y sin solape, y troceo por encabezados Markdown con máximo 1500 y 1000, mínimo 200, con y sin la ruta de títulos en el texto embebido (sección «Troceo por estructura Markdown»). Todo sobre nomic-embed-text, Qdrant y k=4.
+- **No entra:** troceo por frases o por tokens; tamaños fijos mayores de 1500; otros modelos (ficha 1); otros k (ficha 4); reranking (ficha 3); hybrid (ficha 6). No se mide la respuesta final del LLM, solo la recuperación.
 
 ## 2. Estado de la cuestión
 
@@ -89,6 +89,7 @@ No se fijó un umbral numérico de mejora antes de probar; el criterio fue elegi
 - Python y librerías: las de `pyproject.toml` y `uv.lock` (`qdrant-client` 1.20.0, `ollama` 0.6.3, `nbconvert` 7.17.2). Qdrant 1.20 en Docker y Ollama con `nomic-embed-text:latest` en un MacBook M2 Pro de 16 GB.
 - Notebook: [notebooks/06_comparar_tamano_chunk.ipynb](../notebooks/06_comparar_tamano_chunk.ipynb). Para ejecutarlo sin abrir Jupyter: `uv run jupyter nbconvert --to notebook --execute notebooks/06_comparar_tamano_chunk.ipynb --ExecutePreprocessor.timeout=-1`. La indexación de las seis configuraciones suma unos 36 minutos (CSV); si se fija un timeout por celda, tiene que ser mayor que eso.
 - Repeticiones: una ejecución. El troceo y los embeddings son deterministas; la latencia y el tiempo de indexación varían entre ejecuciones.
+- Troceo por estructura: [notebooks/07_comparar_troceo_estructura.ipynb](../notebooks/07_comparar_troceo_estructura.ipynb), con `uv run jupyter nbconvert --to notebook --execute notebooks/07_comparar_troceo_estructura.ipynb --ExecutePreprocessor.timeout=-1`. La indexación de las cuatro colecciones de estructura suma unos 16 minutos (CSV). La referencia `pydocs_nomic_c1500_s0` se reutiliza si existe y cuadra con el troceo y con `tamano_chunk.csv`; el notebook no la borra nunca.
 
 ## 4. Resultados
 
@@ -137,7 +138,7 @@ Fallos y resultados que no siguen la tendencia:
 
 - **Qué significan los resultados:** el acierto por fuente apenas depende del tamaño: el modelo encuentra el fichero correcto casi siempre. Lo que cambia es si el chunk devuelto contiene la respuesta. Con 1500 caracteres, 18 de 32 preguntas traen la evidencia entre los 4 primeros, frente a 12 con 500. Además el primer resultado acierta más (ev_hit@1 0,344 frente a 0,219), así que el chunk relevante sube de posición.
 - **Frente a la hipótesis:** se confirma la primera parte: los chunks grandes suben el acierto por evidencia. No aparece la caída por ruido hasta 1500; el acierto por fuente se mantiene en 0,906. La parte del solape se confirma solo a medias: 500/100 mejora a 500 sin solape por evidencia (15 frente a 12) pero pierde 2 preguntas por fuente (hit@4 0,844 frente a 0,906). 1000/200 empata con 1000 sin solape por evidencia (16 preguntas), pierde 1 pregunta en hit@4 y baja el ev_MRR (0,315 frente a 0,378); solo sube un poco el hit@1 (0,656 frente a 0,625) y el MRR (0,758 frente a 0,753).
-- **Explicaciones alternativas:** con chunks grandes hay menos chunks en total (6 639 frente a 19 393), así que acertar entre 4 es más fácil por pura probabilidad. Las evidencias son subcadenas cortas: un chunk más largo tiene más papeletas de contenerlas aunque el resto del texto no sea relevante. Parte de la mejora puede deberse a eso y no a un mejor embedding.
+- **Explicaciones alternativas:** con chunks grandes hay menos chunks en total (6 639 frente a 19 393), así que acertar entre 4 es más fácil por pura probabilidad. Las evidencias son subcadenas cortas: un chunk más largo tiene más papeletas de contenerlas aunque el resto del texto no sea relevante. Parte de la mejora puede deberse a eso y no a un mejor embedding. La sección «Troceo por estructura Markdown» separa en parte ambos efectos.
 - **Limitaciones y amenazas a la validez:**
   - Son 32 preguntas: la diferencia entre 1000 y 1500 es de 2 preguntas, dentro del ruido. Entre 500 y 1500 son 6 preguntas, una diferencia más sólida.
   - Hay una sola ejecución; la latencia y la indexación cambian entre ejecuciones (ver 500/100).
@@ -147,22 +148,115 @@ Fallos y resultados que no siguen la tendencia:
   - La categoría D tiene solo 3 preguntas.
 - **Qué cambiaría si el volumen de datos creciera:** chunks más grandes significan menos vectores. Con 1500 caracteres el índice tiene un tercio de los chunks de 500, la indexación es un 23 % más rápida y la búsqueda tarda la mitad (20 ms frente a 42 ms). Si el corpus crece, esta opción escala mejor en almacenamiento y en tiempo.
 
+## Troceo por estructura Markdown
+
+### Pregunta y criterio
+
+¿Trocear por la estructura Markdown recupera mejor que 1500 caracteres sin solape? La categoría A acierta como mucho 4 de 10 por evidencia con tamaño fijo, y parte de la mejora de 1500 puede venir solo de que un chunk largo contiene más texto. Un troceo que sigue las secciones del documento separa ese efecto del tamaño.
+
+Criterio de decisión, fijado en la issue #11 antes de medir: el troceo por estructura gana si sube ev_hit@4 y ev_MRR frente a 1500/0, sobre todo en la categoría A, sin bajar el hit@4 por fuente y con un tamaño medio de chunk parecido o menor. «Sobre todo en la categoría A» se aplica como: el ev_hit@4 de A también sube. Las cuatro configuraciones medidas lo cumplen, así que esta lectura no cambia el resultado.
+
+### Método
+
+El troceo es `trocear_por_estructura(carpeta, maximo, minimo)` de `scripts/comparar_embeddings.py`:
+
+- Abre una sección en cada encabezado `#` a `####` que esté fuera de un bloque de código ```` ``` ````. Las líneas `#` dentro de un bloque son comentarios de Python.
+- Une una sección de menos de `minimo` caracteres con la siguiente del mismo fichero (la última, con la anterior). Nunca une ficheros distintos.
+- Subdivide una sección de más de `maximo` por líneas en blanco, sin cortar un bloque de código ni una entrada de lista de definiciones (`termino` seguido de `:   texto`). Un bloque que solo ya pasa de `maximo` queda entero, en un chunk propio.
+- Sin solape. Los chunks de un fichero, concatenados, reproducen el fichero; el notebook lo comprueba.
+- Cada chunk lleva `ruta_titulos`, los encabezados abiertos unidos con « > » (por ejemplo, «string — Common string operations > String constants»).
+
+`texto_a_embeber(chunk, con_ruta)` decide qué se embebe: el texto del chunk, o la ruta de títulos, una línea en blanco y el texto. El payload de Qdrant guarda siempre el texto original, así que el acierto por evidencia se mide igual que en la tabla 1.
+
+| Opción | Troceo | Máximo | Mínimo | Ruta en el texto embebido | Colección en Qdrant |
+|---|---|---|---|---|---|
+| G | estructura | 1500 | 200 | sí | `pydocs_nomic_est1500_m200_ruta` |
+| H | estructura | 1500 | 200 | no | `pydocs_nomic_est1500_m200_sinruta` |
+| I | estructura | 1000 | 200 | sí | `pydocs_nomic_est1000_m200_ruta` |
+| J | estructura | 1000 | 200 | no | `pydocs_nomic_est1000_m200_sinruta` |
+| D (referencia) | fijo | 1500 | — | no | `pydocs_nomic_c1500_s0` |
+
+El resto es igual que en la sección 3: modelo, prefijos, Qdrant con coseno, k=4, corpus, golden set y evidencias. La referencia D se reutilizó de la primera prueba; su tiempo de indexación es el de `tamano_chunk.csv`.
+
+### Resultados
+
+**Tabla 4. Métricas por configuración (32 preguntas A-D, k=4).** Entre paréntesis, preguntas acertadas.
+
+| Opción | Chunks | Tamaño medio (caracteres) | hit@1 | hit@4 | MRR | ev_hit@1 | ev_hit@4 | ev_MRR |
+|---|---|---|---|---|---|---|---|---|
+| G: estructura 1500, con ruta | 7 955 | 1 203 | 0,750 | 0,875 (28) | 0,807 | 0,375 | 0,594 (19) | 0,477 |
+| **H: estructura 1500, sin ruta** | **7 955** | **1 203** | **0,719** | **0,906 (29)** | **0,786** | **0,406** | **0,594 (19)** | **0,477** |
+| I: estructura 1000, con ruta | 10 554 | 907 | 0,781 | 0,844 (27) | 0,807 | 0,406 | 0,625 (20) | 0,495 |
+| J: estructura 1000, sin ruta | 10 554 | 907 | 0,750 | 0,844 (27) | 0,792 | 0,438 | 0,563 (18) | 0,487 |
+| D: fijo 1500 | 6 639 | 1 441 | 0,719 | 0,906 (29) | 0,794 | 0,344 | 0,563 (18) | 0,422 |
+
+La fila D reproduce las métricas de recuperación de la fila 1500 de la tabla 1 (misma colección); la latencia se midió de nuevo (20,9 ms frente a 19,8 ms).
+
+**Tabla 5. Coste por configuración.**
+
+| Opción | Latencia media (ms) | Indexación (s) | Evidencias partidas | Chunks de más de 6 000 caracteres | Score medio del mejor resultado en E |
+|---|---|---|---|---|---|
+| G | 25,5 | 236 | 0 | 71 (máx. 203 072) | 0,639 |
+| H | 18,8 | 228 | 0 | 71 (máx. 203 072) | 0,659 |
+| I | 17,5 | 251 | 0 | 71 (máx. 203 072) | 0,638 |
+| J | 18,5 | 240 | 0 | 71 (máx. 203 072) | 0,660 |
+| D | 20,9 | 228 | 0 | 0 (máx. 1 500) | 0,637 |
+
+**Tabla 6. Por categoría: ev_hit@4, ev_MRR en A y hit@4 por fuente.**
+
+| Categoría (n) | G | H | I | J | D |
+|---|---|---|---|---|---|
+| A, ev_hit@4 (10) | 0,6 | 0,5 | 0,7 | 0,5 | 0,3 |
+| A, ev_MRR | 0,450 | 0,358 | 0,517 | 0,433 | 0,183 |
+| B, ev_hit@4 (10) | 0,7 | 0,7 | 0,6 | 0,6 | 0,9 |
+| C, ev_hit@4 (9) | 0,67 | 0,78 | 0,78 | 0,78 | 0,67 |
+| D, ev_hit@4 (3) | 0 | 0 | 0 | 0 | 0 |
+| A, hit@4 por fuente | 0,8 | 0,9 | 0,8 | 0,8 | 0,8 |
+| B, hit@4 por fuente | 0,8 | 0,9 | 0,7 | 0,8 | 1,0 |
+
+**Tabla 7. Criterio de decisión aplicado frente a D.**
+
+| Opción | Sube ev_hit@4 | Sube ev_MRR | Sube ev_hit@4 en A | No baja hit@4 por fuente | Tamaño medio parecido o menor | Gana |
+|---|---|---|---|---|---|---|
+| G | sí (19 frente a 18) | sí | sí (6 frente a 3) | no (28 frente a 29) | sí | no |
+| **H** | **sí (19 frente a 18)** | **sí** | **sí (5 frente a 3)** | **sí (29)** | **sí** | **sí** |
+| I | sí (20 frente a 18) | sí | sí (7 frente a 3) | no (27 frente a 29) | sí | no |
+| J | no (18, empate) | sí | sí (5 frente a 3) | no (27 frente a 29) | sí | no |
+
+Fallos y resultados que no siguen la tendencia:
+
+- **La categoría B baja** con todos los troceos por estructura: de 9 de 10 por evidencia con D a 7 (G, H) o 6 (I, J). La mejora en A y C la compensa B en parte; en H, A suma 2 preguntas, C suma 1 y B resta 2.
+- **La ruta de títulos** sube el acierto por evidencia en A (G 6 y I 7, frente a 5 sin ruta). En el total, con 1500 empata por evidencia (G 19, H 19) y baja el acierto por fuente (G 28 frente a 29 en H); con 1000 sube por evidencia (I 20 frente a 18 en J) y empata por fuente (I y J, 27). El efecto de la ruta en el hit@4 por fuente solo aparece con 1500. Con 1000, sin ruta el ev_hit@4 no sube respecto a D.
+- **La categoría D (varias fuentes)** no acierta por evidencia en ninguna configuración.
+- **Preguntas E:** el score del mejor resultado está entre 0,63 y 0,67 en todas. Sin ruta es algo mayor (0,659 y 0,660) que con ruta o con D (0,637-0,639). Sigue sin haber un corte que separe estas preguntas.
+- **Latencia de G (25,5 ms)**: es la mayor, con el mismo número de chunks que H (18,8 ms). Con una sola ejecución no se sabe si es una variación puntual.
+
+### Discusión
+
+- **Qué significan los resultados:** H acierta por evidencia una pregunta más que D con chunks un 17 % más cortos de media, y sube el ev_MRR de 0,422 a 0,477: el chunk con la evidencia aparece antes. En la categoría A, la que motivó la prueba, pasa de 3 a 5 de 10. La mejora de la tabla 1 no se explica solo porque un chunk largo contenga más texto: cortar por secciones, con chunks más cortos, mantiene o sube el acierto por evidencia. J, con chunks de 907 caracteres de media, empata con D en ev_hit@4.
+- **Frente al criterio:** H es la única opción que lo cumple entero. G empata con H por evidencia (19) y solo gana en la categoría A (6 frente a 5), pero baja el hit@4 por fuente (28 frente a 29). I es la única que supera a H por evidencia (20), pero baja el hit@4 por fuente a 27, como J.
+- **Limitaciones y amenazas a la validez:**
+  - Hay una sola ejecución con 32 preguntas: una pregunta vale 0,031. La diferencia entre H y D en ev_hit@4 es de una pregunta, dentro del ruido. La de ev_MRR y la de la categoría A (2 preguntas de 10) son mayores, pero A tiene solo 10 preguntas.
+  - 71 chunks pasan de 6 000 caracteres; el mayor tiene 203 072. Son bloques que el troceo no corta (bloques de código o entradas de definición enteros, o párrafos sin líneas en blanco). Ollama sirve `nomic-embed-text` con un contexto de 2048 tokens y recorta sin error las entradas más largas (con `truncate=False`, la llamada falla). Se comprobó a mano con el chunk de 203 072 caracteres durante la preparación del notebook 07; esa prueba no queda en las salidas del notebook. Los más largos se embeben, por tanto, solo por su comienzo. Con tamaño fijo ningún chunk pasa de 1 500 caracteres.
+  - Esos mismos chunks llegan enteros al prompt si se recuperan: un solo resultado puede ocupar más que los unos 4 800 caracteres de contexto que el prompt recibe de media con k=4 (sección 7).
+  - Solo se probó `minimo` 200 y dos valores de `maximo`.
+
 ## 6. Conclusión y decisión
 
 | Campo | Contenido |
 |---|---|
-| Decisión | Chunks de 1500 caracteres sin solape (colección `pydocs_nomic_c1500_s0`), de forma provisional. |
-| Motivo principal | Es la configuración con más acierto por evidencia (ev_hit@4 0,563, frente a 0,375 de la base de 500) sin perder acierto por fuente (0,906). |
-| Alternativas descartadas | 300 y 500: menos acierto por evidencia que 1500 (0,438 y 0,375 frente a 0,563). 1000: muy cerca, queda como alternativa si el prompt al LLM resulta demasiado largo. Con solape: 500/100 baja el acierto por fuente y 1000/200 no sube el de evidencia, y añaden un 24 % (500/100) y un 23 % (1000/200) más de chunks y más tiempo de indexación. |
-| Coste o riesgo asumido | Más texto por resultado en el prompt (unos 1 500 tokens con k=4). Riesgo de que tamaños mayores sean aún mejores y no los hayamos medido. |
-| Cuándo se revisa | Al cerrar las fichas 3 (reranking) y 4 (k), que se miden ya sobre esta colección; si el LLM da respuestas peores con chunks largos; o si se prueba un troceo por secciones Markdown. Conviene una prueba corta con 2000 caracteres y repetir la ficha 1 con 1500. |
+| Decisión | Troceo por estructura Markdown con máximo 1500 y mínimo 200, sin ruta de títulos en el texto embebido (colección `pydocs_nomic_est1500_m200_sinruta`), de forma provisional. Sustituye a 1500 caracteres sin solape. |
+| Motivo principal | Es la única configuración que cumple el criterio fijado antes de medir: frente a 1500/0 sube ev_hit@4 (0,594 frente a 0,563) y ev_MRR (0,477 frente a 0,422), en la categoría A pasa de 3 a 5 de 10 por evidencia, mantiene el hit@4 por fuente (0,906) y tiene chunks más cortos de media (1 203 frente a 1 441 caracteres). |
+| Alternativas descartadas | 1500 sin solape (`pydocs_nomic_c1500_s0`): queda como vuelta atrás, con el mismo acierto por fuente y una pregunta menos por evidencia. Estructura 1500 con ruta de títulos: empata por evidencia con la elegida (19) y baja el hit@4 por fuente (0,875 frente a 0,906). Estructura 1000 con ruta: sube el ev_hit@4 (0,625), pero baja el hit@4 por fuente a 0,844 frente a 0,906 de 1500/0. Estructura 1000 sin ruta: no sube el ev_hit@4 (0,563) y baja el hit@4 por fuente (0,844). 300 y 500: menos acierto por evidencia que 1500 (0,438 y 0,375 frente a 0,563). 1000 fijo: muy cerca de 1500 fijo. Con solape: 500/100 baja el acierto por fuente y 1000/200 no sube el de evidencia, y añaden un 24 % (500/100) y un 23 % (1000/200) más de chunks y más tiempo de indexación. |
+| Coste o riesgo asumido | La ventaja global es de una pregunta (19 frente a 18), dentro del ruido, y la categoría B baja de 9 a 7 de 10 por evidencia. 71 chunks pasan de 6 000 caracteres (máximo 203 072): los más largos se embeben solo por su comienzo y, si se recuperan, meten mucho texto en el prompt. Hay un 20 % más de chunks que con 1500 fijo (7 955 frente a 6 639). |
+| Cuándo se revisa | Al cerrar las fichas 3 (reranking) y 4 (k), que se miden sobre esta colección; si el LLM da respuestas peores con chunks largos; si se limita el tamaño de los bloques que el troceo no corta, para que ningún chunk pase del contexto de Ollama; o si se amplía el golden set, porque la ventaja frente a 1500 fijo es de una pregunta. Conviene repetir la ficha 1 con este troceo. |
 
 ## 7. Impacto en el workflow
 
-- El paso «el agente consulta el RAG» busca en la colección `pydocs_nomic_c1500_s0` de Qdrant, con el prefijo `search_query: ` de nomic.
-- La indexación usa `trocear_corpus(carpeta, tamano=1500, solape=0)`.
-- Las fichas 3, 4 y 6 parten de esta configuración en vez de la base de 500.
-- El prompt del agente tiene que admitir unos 6 000 caracteres de contexto con k=4.
+- El paso «el agente consulta el RAG» busca en la colección `pydocs_nomic_est1500_m200_sinruta` de Qdrant, con el prefijo `search_query: ` de nomic.
+- La indexación usa `trocear_por_estructura(carpeta, maximo=1500, minimo=200)` y embebe `preparar_documento("nomic", texto_a_embeber(chunk, con_ruta=False))`. El payload guarda `fuente`, `texto` y `ruta_titulos`.
+- Las fichas 3, 4 y 6 parten de esta configuración en vez de 1500 sin solape.
+- El prompt del agente recibe de media unos 4 800 caracteres de contexto con k=4, pero un solo resultado puede pasar de 6 000 (hasta 203 072). El prompt tiene que admitirlo o limitar el texto de cada resultado.
 
 ## 8. Referencias
 
@@ -173,16 +267,16 @@ Fallos y resultados que no siguen la tendencia:
 
 ## Anexos
 
-- Notebook: [notebooks/06_comparar_tamano_chunk.ipynb](../notebooks/06_comparar_tamano_chunk.ipynb)
-- Datos brutos: `data/resultados/tamano_chunk.csv`
-- Troceo: `trocear_corpus` en [scripts/comparar_embeddings.py](../scripts/comparar_embeddings.py)
+- Notebooks: [notebooks/06_comparar_tamano_chunk.ipynb](../notebooks/06_comparar_tamano_chunk.ipynb) (tamaño fijo) y [notebooks/07_comparar_troceo_estructura.ipynb](../notebooks/07_comparar_troceo_estructura.ipynb) (estructura)
+- Datos brutos: `data/resultados/tamano_chunk.csv` y `data/resultados/troceo_estructura.csv`
+- Troceo: `trocear_corpus`, `trocear_por_estructura` y `texto_a_embeber` en [scripts/comparar_embeddings.py](../scripts/comparar_embeddings.py)
 
 ---
 
 ## Lista de comprobación antes de exponer
 
 - [x] La pregunta está formulada en una frase y se puede responder con datos.
-- [ ] La hipótesis y el umbral de éxito se escribieron antes de probar. _La hipótesis sí; no hubo umbral numérico, solo «el mayor ev_hit@4 sin perder acierto por fuente»._
+- [ ] La hipótesis y el umbral de éxito se escribieron antes de probar. _En la prueba de tamaño fijo, la hipótesis sí; no hubo umbral numérico, solo «el mayor ev_hit@4 sin perder acierto por fuente». En la del troceo por estructura, el criterio se fijó antes de medir._
 - [x] Solo cambia una variable a la vez; el resto está fijo.
 - [x] Otra persona puede repetir la prueba con la sección 3.
 - [x] Los resultados incluyen lo que no salió como se esperaba.
