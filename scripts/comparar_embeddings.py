@@ -33,22 +33,33 @@ _ID_PREGUNTA = re.compile(r"^[A-Za-z]\d+$")
 _RUTA = re.compile(r"`([^`]+)`")
 
 
-def trocear_corpus(carpeta: Path, tamano: int = 500) -> list[dict]:
-    """Trocea cada .md en tramos consecutivos de `tamano` caracteres, sin solape.
+def trocear_corpus(carpeta: Path, tamano: int = 500, solape: int = 0) -> list[dict]:
+    """Trocea cada .md en tramos de `tamano` caracteres, con `solape` caracteres compartidos.
 
-    Descarta los tramos que solo tienen espacios. Devuelve
-    {"id": int, "fuente": str, "texto": str}, con la fuente relativa a `carpeta`.
+    Cada tramo empieza `tamano - solape` caracteres después del anterior. El último
+    tramo de un fichero es el primero que llega a su final. Descarta los tramos que
+    solo tienen espacios. Devuelve {"id": int, "fuente": str, "texto": str}, con la
+    fuente relativa a `carpeta`.
+
+    Lanza ValueError si `tamano` es menor o igual que 0, o si `solape` es negativo
+    o mayor o igual que `tamano`.
     """
+    if tamano <= 0:
+        raise ValueError(f"tamano debe ser mayor que 0, y es {tamano}")
+    if solape < 0 or solape >= tamano:
+        raise ValueError(f"solape debe estar entre 0 y tamano - 1 ({tamano - 1}), y es {solape}")
+    paso = tamano - solape
     carpeta = Path(carpeta)
     chunks: list[dict] = []
     for ruta in sorted(carpeta.rglob("*.md"), key=lambda p: p.relative_to(carpeta).as_posix()):
         fuente = ruta.relative_to(carpeta).as_posix()
         contenido = ruta.read_text(encoding="utf-8")
-        for inicio in range(0, len(contenido), tamano):
+        for inicio in range(0, len(contenido), paso):
             texto = contenido[inicio:inicio + tamano]
-            if not texto.strip():
-                continue
-            chunks.append({"id": len(chunks), "fuente": fuente, "texto": texto})
+            if texto.strip():
+                chunks.append({"id": len(chunks), "fuente": fuente, "texto": texto})
+            if inicio + tamano >= len(contenido):
+                break
     return chunks
 
 
