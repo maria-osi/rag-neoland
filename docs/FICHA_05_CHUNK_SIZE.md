@@ -1,18 +1,18 @@
 # Ficha de investigación: tamaño de chunk
 
-> Ficha de la pregunta 5 de [TAREA_RAG_A_TEMPO.md](TAREA_RAG_A_TEMPO.md), con la estructura de [PLANTILLA_FICHA_INVESTIGACION.md](PLANTILLA_FICHA_INVESTIGACION.md). Issues [#7](https://github.com/maria-osi/rag-neoland/issues/7) (tamaño fijo) y [#11](https://github.com/maria-osi/rag-neoland/issues/11) (troceo por estructura). Parte del modelo elegido en la [ficha 1](FICHA_01_EMBEDDINGS.md).
+> Ficha de la pregunta 5 de [TAREA_RAG_A_TEMPO.md](TAREA_RAG_A_TEMPO.md), con la estructura de [PLANTILLA_FICHA_INVESTIGACION.md](PLANTILLA_FICHA_INVESTIGACION.md). Issues [#7](https://github.com/maria-osi/rag-neoland/issues/7) (tamaño fijo), [#11](https://github.com/maria-osi/rag-neoland/issues/11) (troceo por estructura) y [#22](https://github.com/maria-osi/rag-neoland/issues/22) (troceo con límite duro). Parte del modelo elegido en la [ficha 1](FICHA_01_EMBEDDINGS.md).
 
 | Campo | Valor |
 |---|---|
 | Autores | Maria (persona A: indexación) |
 | Fecha | 2026-11-17 |
-| Versión | v2 |
+| Versión | v3 |
 | Estado | cerrada |
 | Pregunta nº | 5 |
 
 ## Resumen (máx. 150 palabras)
 
-Qué troceo recupera mejor la documentación de Python 3.15, con nomic-embed-text, Qdrant, k=4 y las 32 preguntas A-D del golden set. Entre seis troceos de tamaño fijo, el acierto por evidencia sube desde 500 (ev_hit@4 0,375) hasta 1500 (0,563), y el solape no compensa. Después se comparó 1500 fijo con un troceo por encabezados Markdown (máximo 1500 o 1000, mínimo 200, con y sin ruta de títulos). Solo estructura 1500/200 sin ruta cumple el criterio fijado antes de medir: sube ev_hit@4 a 0,594 y ev_MRR de 0,422 a 0,477, en la categoría A pasa de 3 a 5 de 10, mantiene el hit@4 por fuente (0,906) y sus chunks son más cortos de media (1 203 frente a 1 441 caracteres). Se elige esa configuración: la ventaja global es de una pregunta y 71 chunks pasan de 6 000 caracteres; los más largos se embeben solo por su comienzo.
+Qué troceo recupera mejor la documentación de Python 3.15, con nomic-embed-text, Qdrant, k=4 y las 32 preguntas A-D del golden set. Entre seis troceos de tamaño fijo, el acierto por evidencia sube desde 500 (ev_hit@4 0,375) hasta 1500 (0,563), y el solape no compensa. El troceo por encabezados Markdown con máximo 1500, mínimo 200 y sin ruta de títulos es el único que cumple el criterio fijado antes de medir: sube ev_hit@4 a 0,594 y ev_MRR de 0,422 a 0,477, mantiene el hit@4 por fuente (0,906) y acorta los chunks (1 203 frente a 1 441 caracteres de media). Se elige, aunque gana por una pregunta y 773 chunks pasan de 1 500 caracteres. Un troceo con límite duro deja 69, todos bloques de código, pero con reranker acierta 25 evidencias frente a 26 y 29 fuentes frente a 30: no se adopta.
 
 ## 1. Introducción
 
@@ -30,8 +30,8 @@ Los chunks más grandes que 500 caracteres suben el acierto por evidencia, porqu
 
 ### 1.4 Alcance y exclusiones
 
-- **Entra:** troceo por caracteres de 300, 500, 1000 y 1500, con y sin solape, y troceo por encabezados Markdown con máximo 1500 y 1000, mínimo 200, con y sin la ruta de títulos en el texto embebido (sección «Troceo por estructura Markdown»). Todo sobre nomic-embed-text, Qdrant y k=4.
-- **No entra:** troceo por frases o por tokens; tamaños fijos mayores de 1500; otros modelos (ficha 1); otros k (ficha 4); reranking (ficha 3); hybrid (ficha 6). No se mide la respuesta final del LLM, solo la recuperación.
+- **Entra:** troceo por caracteres de 300, 500, 1000 y 1500, con y sin solape, y troceo por encabezados Markdown con máximo 1500 y 1000, mínimo 200, con y sin la ruta de títulos en el texto embebido (sección «Troceo por estructura Markdown»), y troceo con límite duro de 1500, con y sin ruta y con y sin reranker (sección «Troceo con límite duro»). Todo sobre nomic-embed-text, Qdrant y k=4.
+- **No entra:** troceo por frases o por tokens; tamaños fijos mayores de 1500; otros modelos (ficha 1); otros k (ficha 4); otros rerankers (ficha 3); hybrid (ficha 6). No se mide la respuesta final del LLM, solo la recuperación.
 
 ## 2. Estado de la cuestión
 
@@ -90,6 +90,7 @@ No se fijó un umbral numérico de mejora antes de probar; el criterio fue elegi
 - Notebook: [notebooks/06_comparar_tamano_chunk.ipynb](../notebooks/06_comparar_tamano_chunk.ipynb). Para ejecutarlo sin abrir Jupyter: `uv run jupyter nbconvert --to notebook --execute notebooks/06_comparar_tamano_chunk.ipynb --ExecutePreprocessor.timeout=-1`. La indexación de las seis configuraciones suma unos 36 minutos (CSV); si se fija un timeout por celda, tiene que ser mayor que eso.
 - Repeticiones: una ejecución. El troceo y los embeddings son deterministas; la latencia y el tiempo de indexación varían entre ejecuciones.
 - Troceo por estructura: [notebooks/07_comparar_troceo_estructura.ipynb](../notebooks/07_comparar_troceo_estructura.ipynb), con `uv run jupyter nbconvert --to notebook --execute notebooks/07_comparar_troceo_estructura.ipynb --ExecutePreprocessor.timeout=-1`. La indexación de las cuatro colecciones de estructura suma unos 16 minutos (CSV). La referencia `pydocs_nomic_c1500_s0` se reutiliza si existe y cuadra con el troceo y con `tamano_chunk.csv`; el notebook no la borra nunca.
+- Troceo con límite duro: [notebooks/11_comparar_troceo_limitado.ipynb](../notebooks/11_comparar_troceo_limitado.ipynb), con `uv run jupyter nbconvert --to notebook --execute notebooks/11_comparar_troceo_limitado.ipynb --ExecutePreprocessor.timeout=-1`. Se ejecutó en Windows 11 con el reranker en CPU. Reutiliza `pydocs_nomic_est1500_m200_sinruta`, que usa `scripts/consultar_rag.py`, y no la borra nunca; recrea las otras tres colecciones.
 
 ## 4. Resultados
 
@@ -241,6 +242,131 @@ Fallos y resultados que no siguen la tendencia:
   - Esos mismos chunks llegan enteros al prompt si se recuperan: un solo resultado puede ocupar más que los unos 5 900 caracteres de contexto que el prompt recibe de media con k=4 (medido en la ficha 4).
   - Solo se probó `minimo` 200 y dos valores de `maximo`.
 
+## Troceo con límite duro
+
+### Pregunta y criterio
+
+¿Mejora la recuperación si ningún chunk pasa de 1500 caracteres salvo un bloque de código indivisible? Con `trocear_por_estructura` 1500/200, 773 de 7 955 chunks pasan de 1500 caracteres, 709 de ellos sin ser un bloque de código, y el mayor tiene 203 072 (tabla 8). En B01 y B08 la evidencia está en chunks de 4 870 y 14 608 caracteres, y empieza en el carácter 3 061 y 3 683 de su chunk (tabla de B01 y B08, más abajo).
+
+Criterio de decisión, fijado en la issue #22 antes de medir. Un acierto es una pregunta A-D con rango de 1 a 4; se cuentan preguntas, no tasas, y se comparan configuraciones con reranker:
+
+- El troceo limitado sin ruta se adopta si sus aciertos por evidencia (ev_hit@4) y por fuente (hit@4) no bajan frente al troceo actual sin ruta, que es la configuración final.
+- El troceo limitado con ruta se adopta en su lugar si tampoco baja frente al actual sin ruta y además suma al menos 2 aciertos por evidencia más que el limitado sin ruta (el umbral de las fichas 3 y 6).
+- Si no se cumple ninguna de las dos, la configuración final no cambia.
+
+### Método
+
+El troceo nuevo es `trocear_con_limite(carpeta, maximo, minimo)` de `scripts/comparar_embeddings.py`. Hace las mismas secciones que `trocear_por_estructura`, con la misma unión por `minimo` y la misma `ruta_titulos`. Una sección mayor que `maximo` se parte así:
+
+- Una entrada de definición que no cabe (por ejemplo, `class logging.Logger` con sus atributos y métodos) se parte por sus miembros anidados, agrupando miembros consecutivos mientras quepan.
+- Un miembro o una entrada que sigue sin caber se parte por párrafos; después, por líneas, y una línea más larga que el máximo, en el último espacio antes del límite.
+- Una tabla que no cabe se parte por grupos de filas, y cada grupo después del primero repite la cabecera y la separación.
+- Un encabezado no termina un chunk: pasa al siguiente con su primer bloque, salvo que juntos no quepan, como ante un bloque de código mayor que el máximo.
+- Un bloque de código no se corta nunca. Si con su contexto pasa del máximo, ocupa un chunk propio: es la única excepción al límite.
+- Cada chunk que no empieza la sección lleva delante su contexto, copiado del fichero, en la medida en que quepa: el encabezado de la sección, el término de cada entrada de definición que lo contiene y, en una tabla, la cabecera. Se guarda también aparte, en el campo `contexto`. Sin el contexto, los chunks de un fichero concatenados reproducen el fichero; el notebook lo comprueba.
+
+El troceo nuevo reconoce además una valla de código detrás de `:   `, como las de `library/tkinter.md`. `trocear_por_estructura` no la reconoce: la paridad de vallas se invierte y de ahí sale su chunk de 203 072 caracteres. `trocear_por_estructura` no se ha cambiado, porque la configuración final se indexa con él.
+
+Se comparan 8 configuraciones: troceo actual (`trocear_por_estructura`) y limitado (`trocear_con_limite`), ambos 1500/200; con y sin ruta de títulos en el texto embebido; con y sin reranker. Sin reranker se devuelven los 4 primeros de la búsqueda; con reranker se recuperan 20 candidatos y `cross-encoder/ms-marco-MiniLM-L-6-v2` deja los 4 mejores, como `scripts/consultar_rag.py`. El acierto por evidencia usa las varias redacciones por fuente de [golden_set_evidencias.json](golden_set_evidencias.json) (issue #21), así que sus cifras no son comparables con las de las tablas 1 a 7, medidas con una sola evidencia por fuente. El resto es igual que en la sección 3.
+
+| Troceo | Ruta en el texto embebido | Colección en Qdrant |
+|---|---|---|
+| actual | no | `pydocs_nomic_est1500_m200_sinruta` |
+| actual | sí | `pydocs_nomic_est1500_m200_ruta` |
+| limitado | no | `pydocs_nomic_lim1500_m200_sinruta` |
+| limitado | sí | `pydocs_nomic_lim1500_m200_ruta` |
+
+Cada colección sirve a las dos variantes de reranker.
+
+### Resultados
+
+**Tabla 8. Tamaño de los chunks por troceo.**
+
+| Troceo | Chunks | Tamaño medio (caracteres) | Tamaño máximo (caracteres) | Por encima de 1 500 | Por encima de 1 500 que no son un bloque de código | Evidencias partidas |
+|---|---|---|---|---|---|---|
+| actual | 7 955 | 1 203 | 203 072 | 773 | 709 | 0 |
+| limitado | 9 143 | 1 079 | 22 273 | 69 | 0 | 0 |
+
+**Tabla 9. Métricas por configuración (32 preguntas A-D, k=4, varias evidencias por fuente).** Entre paréntesis, preguntas acertadas.
+
+| Troceo | Ruta | Reranker | hit@1 | hit@4 | MRR | ev_hit@1 | ev_hit@4 | ev_MRR |
+|---|---|---|---|---|---|---|---|---|
+| actual | no | no | 0,719 | 0,906 (29) | 0,786 | 0,438 | 0,656 (21) | 0,529 |
+| **actual** | **no** | **sí** | **0,688** | **0,938 (30)** | **0,797** | **0,438** | **0,813 (26)** | **0,604** |
+| actual | sí | no | 0,750 | 0,875 (28) | 0,802 | 0,469 | 0,656 (21) | 0,555 |
+| actual | sí | sí | 0,688 | 0,938 (30) | 0,813 | 0,438 | 0,781 (25) | 0,599 |
+| limitado | no | no | 0,781 | 0,906 (29) | 0,828 | 0,344 | 0,719 (23) | 0,492 |
+| limitado | no | sí | 0,594 | 0,906 (29) | 0,727 | 0,313 | 0,781 (25) | 0,526 |
+| limitado | sí | no | 0,750 | 0,938 (30) | 0,826 | 0,438 | 0,719 (23) | 0,560 |
+| limitado | sí | sí | 0,625 | 0,906 (29) | 0,755 | 0,313 | 0,781 (25) | 0,531 |
+
+En negrita, la configuración final. Sus métricas reproducen las de la validación final ([comparativa](COMPARATIVA_RAG_CONSOLIDADA.md), sección 4), y las de la fila actual sin ruta ni reranker reproducen por fuente la fila H de la tabla 4.
+
+**Tabla 10. ev_hit@4 por categoría (preguntas acertadas).**
+
+| Categoría (n) | actual, no, no | actual, no, sí | actual, sí, no | actual, sí, sí | limitado, no, no | limitado, no, sí | limitado, sí, no | limitado, sí, sí |
+|---|---|---|---|---|---|---|---|---|
+| A (10) | 6 | 9 | 7 | 8 | 5 | 7 | 7 | 7 |
+| B (10) | 7 | 8 | 7 | 8 | 10 | 10 | 9 | 10 |
+| C (9) | 8 | 8 | 7 | 8 | 8 | 8 | 7 | 8 |
+| D (3) | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 |
+
+Las columnas son troceo, ruta y reranker.
+
+**Tabla 11. Latencia e indexación.**
+
+| Troceo | Ruta | Reranker | Búsqueda (ms) | Reranking (ms) | Total (ms) | Indexación (s) |
+|---|---|---|---|---|---|---|
+| actual | no | no | 84,7 | 0 | 84,7 | 228 |
+| actual | no | sí | 84,7 | 1 111,2 | 1 195,9 | 228 |
+| actual | sí | no | 85,6 | 0 | 85,6 | 130 |
+| actual | sí | sí | 85,6 | 1 095,3 | 1 180,9 | 130 |
+| limitado | no | no | 79,0 | 0 | 79,0 | 146 |
+| limitado | no | sí | 79,0 | 956,7 | 1 035,7 | 146 |
+| limitado | sí | no | 78,5 | 0 | 78,5 | 147 |
+| limitado | sí | sí | 78,5 | 922,3 | 1 000,7 | 147 |
+
+La búsqueda (embedding de la query más 20 candidatos de Qdrant) se mide una vez por colección y sirve a las dos variantes de reranker. Las latencias se midieron en Windows 11 con el reranker en CPU y no son comparables con las de las tablas 2 y 5 ni con las de otras fichas. La indexación de `pydocs_nomic_est1500_m200_sinruta` (228 s) no se repitió: se toma de `troceo_estructura.csv`, medida en otra máquina.
+
+**B01 y B08.** Con el troceo limitado las dos traen la evidencia entre los 4 primeros en las cuatro configuraciones; con el actual, solo B01 con ruta y sin reranker (rango 4).
+
+| Pregunta | Troceo | Chunk de la evidencia (caracteres) | Posición de la evidencia en el chunk | Rango por evidencia, sin ruta y con reranker |
+|---|---|---|---|---|
+| B01 | actual | 4 870 | 3 061 | fuera del top 4 |
+| B01 | limitado | 1 472 | 393 | 1 |
+| B08 | actual | 14 608 | 3 683 | fuera del top 4 |
+| B08 | limitado | 1 416 | 673 | 3 |
+
+**Tabla 12. Criterio de decisión aplicado (con reranker).**
+
+| Configuración | Aciertos por evidencia | Aciertos por fuente | No baja frente al actual sin ruta | +2 por evidencia frente al limitado sin ruta | Se adopta |
+|---|---|---|---|---|---|
+| actual sin ruta (referencia) | 26 | 30 | — | — | — |
+| limitado sin ruta | 25 | 29 | no (−1 y −1) | — | no |
+| limitado con ruta | 25 | 29 | no (−1 y −1) | no (0) | no |
+
+Fallos y resultados que no siguen la tendencia:
+
+- **Preguntas que cambian** entre el troceo actual y el limitado, sin ruta y con reranker: B01 y B08 pasan a traer la evidencia (rangos 1 y 3); A04, A05 y D01 la pierden; D03 pierde la fuente.
+- **La categoría B** sube a 10 de 10 por evidencia en tres de las cuatro configuraciones limitadas, y la A baja: con reranker y sin ruta, de 9 a 7.
+- **El reranker baja el hit@1 por fuente** con el troceo limitado: sin ruta, de 0,781 a 0,594; con ruta, de 0,750 a 0,625. Con el troceo actual baja menos (de 0,719 a 0,688 sin ruta). El ev_hit@1 del troceo limitado también baja con reranker (de 0,344 a 0,313 sin ruta).
+- **Sin reranker**, el troceo limitado sin ruta acierta 2 evidencias más que el actual sin ruta (23 frente a 21) con el mismo acierto por fuente (29). El criterio se aplica con reranker, porque es la configuración final.
+- **El reranking tarda menos** con el troceo limitado: 957 frente a 1 111 ms sin ruta y 922 frente a 1 095 ms con ruta (tabla 11).
+
+### Discusión
+
+- **Qué significan los resultados:** el límite duro cumple lo que promete sobre el tamaño: los 709 chunks largos que no eran código desaparecen, el mayor baja de 203 072 a 22 273 caracteres y ninguna evidencia queda partida. En B01 y B08 la evidencia pasa a estar en los primeros 700 caracteres de un chunk de menos de 1 500, y las dos aciertan. Con reranker, ese avance se compensa con tres evidencias perdidas en A04, A05 y D01, y el total baja de 26 a 25.
+- **Frente al criterio:** ninguna configuración limitada se adopta. Sin ruta y con ruta pierden una evidencia y una fuente frente al actual sin ruta, y con ruta no suma ninguna evidencia frente a sin ruta.
+- **Limitaciones y amenazas a la validez:**
+  - Una sola ejecución con 32 preguntas: la diferencia con la configuración final es de una pregunta por evidencia y una por fuente, dentro del ruido.
+  - No se midió por qué el reranker baja el hit@1 por fuente con el troceo limitado ni por qué A04, A05 y D01 pierden la evidencia.
+  - Solo se probó `maximo` 1500 y `minimo` 200.
+  - Las latencias son de otra máquina que las de las tablas anteriores.
+
+### Decisión
+
+No se adopta el troceo con límite duro. `COLECCION` en `scripts/consultar_rag.py` sigue siendo `pydocs_nomic_est1500_m200_sinruta` y las secciones 6 y 7 no cambian.
+
 ## 6. Conclusión y decisión
 
 | Campo | Contenido |
@@ -267,16 +393,16 @@ Fallos y resultados que no siguen la tendencia:
 
 ## Anexos
 
-- Notebooks: [notebooks/06_comparar_tamano_chunk.ipynb](../notebooks/06_comparar_tamano_chunk.ipynb) (tamaño fijo) y [notebooks/07_comparar_troceo_estructura.ipynb](../notebooks/07_comparar_troceo_estructura.ipynb) (estructura)
-- Datos brutos: `data/resultados/tamano_chunk.csv` y `data/resultados/troceo_estructura.csv`
-- Troceo: `trocear_corpus`, `trocear_por_estructura` y `texto_a_embeber` en [scripts/comparar_embeddings.py](../scripts/comparar_embeddings.py)
+- Notebooks: [notebooks/06_comparar_tamano_chunk.ipynb](../notebooks/06_comparar_tamano_chunk.ipynb) (tamaño fijo), [notebooks/07_comparar_troceo_estructura.ipynb](../notebooks/07_comparar_troceo_estructura.ipynb) (estructura) y [notebooks/11_comparar_troceo_limitado.ipynb](../notebooks/11_comparar_troceo_limitado.ipynb) (límite duro)
+- Datos brutos: `data/resultados/tamano_chunk.csv`, `data/resultados/troceo_estructura.csv`, `data/resultados/troceo_limitado.csv` y `data/resultados/troceo_limitado_por_pregunta.csv`
+- Troceo: `trocear_corpus`, `trocear_por_estructura`, `trocear_con_limite`, `es_bloque_de_codigo` y `texto_a_embeber` en [scripts/comparar_embeddings.py](../scripts/comparar_embeddings.py)
 
 ---
 
 ## Lista de comprobación antes de exponer
 
 - [x] La pregunta está formulada en una frase y se puede responder con datos.
-- [ ] La hipótesis y el umbral de éxito se escribieron antes de probar. _En la prueba de tamaño fijo, la hipótesis sí; no hubo umbral numérico, solo «el mayor ev_hit@4 sin perder acierto por fuente». En la del troceo por estructura, el criterio se fijó antes de medir._
+- [ ] La hipótesis y el umbral de éxito se escribieron antes de probar. _En la prueba de tamaño fijo, la hipótesis sí; no hubo umbral numérico, solo «el mayor ev_hit@4 sin perder acierto por fuente». En las del troceo por estructura y del límite duro, el criterio se fijó antes de medir._
 - [x] Solo cambia una variable a la vez; el resto está fijo.
 - [x] Otra persona puede repetir la prueba con la sección 3.
 - [x] Los resultados incluyen lo que no salió como se esperaba.
