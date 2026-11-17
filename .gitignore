@@ -20,3 +20,6 @@ apm_modules/
 
 # Datos de Qdrant (Docker)
 qdrant_storage/
+
+# Chunks generados (notebook 05)
+data/chunks/
