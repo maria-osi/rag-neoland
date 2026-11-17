@@ -1,6 +1,6 @@
 """Funciones puras (sin red) del notebook 05_comparar_embeddings_bases.
 
-Troceo del corpus, jsonl de chunks, lectura del golden set y de sus evidencias,
+Troceo del corpus (por tamaño fijo y por estructura Markdown), jsonl de chunks, lectura del golden set y de sus evidencias,
 prefijos por modelo y métricas de recuperación.
 """
 import json
@@ -31,6 +31,7 @@ MODELOS: dict[str, dict] = {
 
 _ID_PREGUNTA = re.compile(r"^[A-Za-z]\d+$")
 _RUTA = re.compile(r"`([^`]+)`")
+_ENCABEZADO = re.compile(r"^(#{1,4}) (.*)$")
 
 
 def trocear_corpus(carpeta: Path, tamano: int = 500, solape: int = 0) -> list[dict]:
@@ -61,6 +62,162 @@ def trocear_corpus(carpeta: Path, tamano: int = 500, solape: int = 0) -> list[di
             if inicio + tamano >= len(contenido):
                 break
     return chunks
+
+
+def _es_valla(linea: str) -> bool:
+    return linea.lstrip().startswith("```")
+
+
+def _secciones(contenido: str) -> list[list[str]]:
+    """Parte un fichero en [texto, ruta_titulos] por encabezados # a #### fuera de código."""
+    secciones: list[list[str]] = []
+    titulos = ["", "", "", ""]
+    en_codigo = False
+    actual: list[str] = []
+    ruta_actual = ""
+    for linea in contenido.splitlines(keepends=True):
+        if en_codigo:
+            actual.append(linea)
+            if _es_valla(linea):
+                en_codigo = False
+            continue
+        if _es_valla(linea):
+            en_codigo = True
+            actual.append(linea)
+            continue
+        m = _ENCABEZADO.match(linea.rstrip("\r\n"))
+        if m:
+            if actual:
+                secciones.append(["".join(actual), ruta_actual])
+            nivel = len(m.group(1))
+            titulos[nivel - 1] = m.group(2).replace("`", "").strip()
+            for i in range(nivel, 4):
+                titulos[i] = ""
+            ruta_actual = " > ".join(t for t in titulos if t)
+            actual = [linea]
+        else:
+            actual.append(linea)
+    if actual:
+        secciones.append(["".join(actual), ruta_actual])
+    return secciones
+
+
+def _bloques(texto: str) -> list[str]:
+    """Separa por líneas en blanco, sin cortar bloques de código ni entradas de definición.
+
+    Cada bloque conserva las líneas en blanco que lo siguen.
+    """
+    lineas = texto.splitlines(keepends=True)
+    bloques: list[str] = []
+    actual: list[str] = []
+    hay_texto = False
+    en_codigo = False
+    en_def = False
+    tras_blanco = False
+    for i, linea in enumerate(lineas):
+        if en_codigo:
+            actual.append(linea)
+            if _es_valla(linea):
+                en_codigo = False
+            continue
+        blanco = not linea.strip()
+        if en_def:
+            if blanco:
+                siguiente = next((x for x in lineas[i + 1:] if x.strip()), None)
+                if siguiente is not None and siguiente[0] in " \t":
+                    actual.append(linea)
+                    continue
+                en_def = False
+            elif linea[0] in " \t:":
+                actual.append(linea)
+                if _es_valla(linea):
+                    en_codigo = True
+                continue
+            else:
+                en_def = False
+        if blanco:
+            actual.append(linea)
+            tras_blanco = True
+            continue
+        if tras_blanco and hay_texto:
+            bloques.append("".join(actual))
+            actual = []
+        tras_blanco = False
+        hay_texto = True
+        actual.append(linea)
+        if _es_valla(linea):
+            en_codigo = True
+        elif i + 1 < len(lineas) and lineas[i + 1].startswith(":"):
+            en_def = True
+    if actual:
+        bloques.append("".join(actual))
+    return bloques
+
+
+def _subdividir(texto: str, maximo: int) -> list[str]:
+    if len(texto) <= maximo:
+        return [texto]
+    trozos: list[str] = []
+    actual = ""
+    for bloque in _bloques(texto):
+        if actual and len(actual) + len(bloque) > maximo:
+            trozos.append(actual)
+            actual = ""
+        actual += bloque
+    if actual:
+        trozos.append(actual)
+    return trozos
+
+
+def trocear_por_estructura(carpeta: Path, maximo: int = 1500, minimo: int = 200) -> list[dict]:
+    """Trocea cada .md por encabezados # a #### (fuera de bloques de código), sin solape.
+
+    Une las secciones menores que `minimo` con la siguiente del mismo fichero (la última,
+    con la anterior) y subdivide las mayores que `maximo` por líneas en blanco, sin cortar
+    bloques de código ni entradas de definición. Devuelve {"id", "fuente", "texto",
+    "ruta_titulos"}; el texto es el original y concatenado reproduce el fichero.
+
+    Lanza ValueError si `maximo` es menor o igual que 0, si `minimo` es negativo o si
+    `minimo` es mayor o igual que `maximo`.
+    """
+    if maximo <= 0:
+        raise ValueError(f"maximo debe ser mayor que 0, y es {maximo}")
+    if minimo < 0:
+        raise ValueError(f"minimo no puede ser negativo, y es {minimo}")
+    if minimo >= maximo:
+        raise ValueError(f"minimo debe ser menor que maximo ({maximo}), y es {minimo}")
+    carpeta = Path(carpeta)
+    chunks: list[dict] = []
+    for ruta in sorted(carpeta.rglob("*.md"), key=lambda p: p.relative_to(carpeta).as_posix()):
+        fuente = ruta.relative_to(carpeta).as_posix()
+        fusion: list[list[str]] = []
+        pendiente: list[str] | None = None
+        for texto, titulos in _secciones(ruta.read_text(encoding="utf-8")):
+            if pendiente is None:
+                pendiente = [texto, titulos]
+            else:
+                pendiente[0] += texto
+            if len(pendiente[0]) >= minimo and pendiente[0].strip():
+                fusion.append(pendiente)
+                pendiente = None
+        if pendiente is not None:
+            if fusion:
+                fusion[-1][0] += pendiente[0]
+            elif pendiente[0].strip():
+                fusion.append(pendiente)
+        for texto, titulos in fusion:
+            for trozo in _subdividir(texto, maximo):
+                chunks.append(
+                    {"id": len(chunks), "fuente": fuente, "texto": trozo, "ruta_titulos": titulos}
+                )
+    return chunks
+
+
+def texto_a_embeber(chunk: dict, con_ruta: bool) -> str:
+    """chunk["texto"], o ruta_titulos + "\\n\\n" + texto si `con_ruta`."""
+    if con_ruta:
+        return chunk["ruta_titulos"] + "\n\n" + chunk["texto"]
+    return chunk["texto"]
 
 
 def guardar_jsonl(chunks: list[dict], ruta: Path) -> None:
