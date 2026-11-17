@@ -238,7 +238,7 @@ Fallos y resultados que no siguen la tendencia:
 - **Limitaciones y amenazas a la validez:**
   - Hay una sola ejecución con 32 preguntas: una pregunta vale 0,031. La diferencia entre H y D en ev_hit@4 es de una pregunta, dentro del ruido. La de ev_MRR y la de la categoría A (2 preguntas de 10) son mayores, pero A tiene solo 10 preguntas.
   - 71 chunks pasan de 6 000 caracteres; el mayor tiene 203 072. Son bloques que el troceo no corta (bloques de código o entradas de definición enteros, o párrafos sin líneas en blanco). Ollama sirve `nomic-embed-text` con un contexto de 2048 tokens y recorta sin error las entradas más largas (con `truncate=False`, la llamada falla). Se comprobó a mano con el chunk de 203 072 caracteres durante la preparación del notebook 07; esa prueba no queda en las salidas del notebook. Los más largos se embeben, por tanto, solo por su comienzo. Con tamaño fijo ningún chunk pasa de 1 500 caracteres.
-  - Esos mismos chunks llegan enteros al prompt si se recuperan: un solo resultado puede ocupar más que los unos 4 800 caracteres de contexto que el prompt recibe de media con k=4 (sección 7).
+  - Esos mismos chunks llegan enteros al prompt si se recuperan: un solo resultado puede ocupar más que los unos 5 900 caracteres de contexto que el prompt recibe de media con k=4 (medido en la ficha 4).
   - Solo se probó `minimo` 200 y dos valores de `maximo`.
 
 ## 6. Conclusión y decisión
@@ -256,7 +256,7 @@ Fallos y resultados que no siguen la tendencia:
 - El paso «el agente consulta el RAG» busca en la colección `pydocs_nomic_est1500_m200_sinruta` de Qdrant, con el prefijo `search_query: ` de nomic.
 - La indexación usa `trocear_por_estructura(carpeta, maximo=1500, minimo=200)` y embebe `preparar_documento("nomic", texto_a_embeber(chunk, con_ruta=False))`. El payload guarda `fuente`, `texto` y `ruta_titulos`.
 - Las fichas 3, 4 y 6 parten de esta configuración en vez de 1500 sin solape.
-- El prompt del agente recibe de media unos 4 800 caracteres de contexto con k=4, pero un solo resultado puede pasar de 6 000 (hasta 203 072). El prompt tiene que admitirlo o limitar el texto de cada resultado.
+- El prompt del agente recibe de media unos 5 900 caracteres de contexto con k=4 (5 926, medido en la [ficha 4](FICHA_04_NUMERO_K.md)), pero un solo resultado puede pasar de 6 000 (hasta 203 072). El prompt tiene que admitirlo o limitar el texto de cada resultado.
 
 ## 8. Referencias
 
