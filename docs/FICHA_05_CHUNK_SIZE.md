@@ -7,12 +7,12 @@
 | Autores | Maria (persona A: indexación) |
 | Fecha | 2026-11-17 |
 | Versión | v2 |
-| Estado | borrador |
+| Estado | cerrada |
 | Pregunta nº | 5 |
 
 ## Resumen (máx. 150 palabras)
 
-Qué troceo recupera mejor la documentación de Python 3.15, con nomic-embed-text, Qdrant, k=4 y las 32 preguntas A-D del golden set. Entre seis troceos de tamaño fijo, el acierto por evidencia sube desde 500 (ev_hit@4 0,375) hasta 1500 (0,563), y el solape no compensa. Después se comparó 1500 fijo con un troceo por encabezados Markdown (máximo 1500 o 1000, mínimo 200, con y sin ruta de títulos). Solo estructura 1500/200 sin ruta cumple el criterio fijado antes de medir: sube ev_hit@4 a 0,594 y ev_MRR de 0,422 a 0,477, en la categoría A pasa de 3 a 5 de 10, mantiene el hit@4 por fuente (0,906) y sus chunks son más cortos de media (1 203 frente a 1 441 caracteres). Se elige esa configuración, provisional: la ventaja global es de una pregunta y 71 chunks pasan de 6 000 caracteres; los más largos se embeben solo por su comienzo.
+Qué troceo recupera mejor la documentación de Python 3.15, con nomic-embed-text, Qdrant, k=4 y las 32 preguntas A-D del golden set. Entre seis troceos de tamaño fijo, el acierto por evidencia sube desde 500 (ev_hit@4 0,375) hasta 1500 (0,563), y el solape no compensa. Después se comparó 1500 fijo con un troceo por encabezados Markdown (máximo 1500 o 1000, mínimo 200, con y sin ruta de títulos). Solo estructura 1500/200 sin ruta cumple el criterio fijado antes de medir: sube ev_hit@4 a 0,594 y ev_MRR de 0,422 a 0,477, en la categoría A pasa de 3 a 5 de 10, mantiene el hit@4 por fuente (0,906) y sus chunks son más cortos de media (1 203 frente a 1 441 caracteres). Se elige esa configuración: la ventaja global es de una pregunta y 71 chunks pasan de 6 000 caracteres; los más largos se embeben solo por su comienzo.
 
 ## 1. Introducción
 
@@ -245,7 +245,7 @@ Fallos y resultados que no siguen la tendencia:
 
 | Campo | Contenido |
 |---|---|
-| Decisión | Troceo por estructura Markdown con máximo 1500 y mínimo 200, sin ruta de títulos en el texto embebido (colección `pydocs_nomic_est1500_m200_sinruta`), de forma provisional. Sustituye a 1500 caracteres sin solape. |
+| Decisión | Troceo por estructura Markdown con máximo 1500 y mínimo 200, sin ruta de títulos en el texto embebido (colección `pydocs_nomic_est1500_m200_sinruta`). Sustituye a 1500 caracteres sin solape. |
 | Motivo principal | Es la única configuración que cumple el criterio fijado antes de medir: frente a 1500/0 sube ev_hit@4 (0,594 frente a 0,563) y ev_MRR (0,477 frente a 0,422), en la categoría A pasa de 3 a 5 de 10 por evidencia, mantiene el hit@4 por fuente (0,906) y tiene chunks más cortos de media (1 203 frente a 1 441 caracteres). |
 | Alternativas descartadas | 1500 sin solape (`pydocs_nomic_c1500_s0`): queda como vuelta atrás, con el mismo acierto por fuente y una pregunta menos por evidencia. Estructura 1500 con ruta de títulos: empata por evidencia con la elegida (19) y baja el hit@4 por fuente (0,875 frente a 0,906). Estructura 1000 con ruta: sube el ev_hit@4 (0,625), pero baja el hit@4 por fuente a 0,844 frente a 0,906 de 1500/0. Estructura 1000 sin ruta: no sube el ev_hit@4 (0,563) y baja el hit@4 por fuente (0,844). 300 y 500: menos acierto por evidencia que 1500 (0,438 y 0,375 frente a 0,563). 1000 fijo: muy cerca de 1500 fijo. Con solape: 500/100 baja el acierto por fuente y 1000/200 no sube el de evidencia, y añaden un 24 % (500/100) y un 23 % (1000/200) más de chunks y más tiempo de indexación. |
 | Coste o riesgo asumido | La ventaja global es de una pregunta (19 frente a 18), dentro del ruido, y la categoría B baja de 9 a 7 de 10 por evidencia. 71 chunks pasan de 6 000 caracteres (máximo 203 072): los más largos se embeben solo por su comienzo y, si se recuperan, meten mucho texto en el prompt. Hay un 20 % más de chunks que con 1500 fijo (7 955 frente a 6 639). |
@@ -260,10 +260,10 @@ Fallos y resultados que no siguen la tendencia:
 
 ## 8. Referencias
 
-1. LangChain. (s. f.). _Text splitters_. LangChain Docs. https://python.langchain.com/docs/concepts/text_splitters/ (consultado el _AAAA-MM-DD_).
-2. Pinecone. (s. f.). _Chunking strategies for LLM applications_. Pinecone Learn. https://www.pinecone.io/learn/chunking-strategies/ (consultado el _AAAA-MM-DD_).
-3. Nussbaum, Z., Morris, J. X., Duderstadt, B. y Mulyar, A. (2024). _Nomic Embed: Training a reproducible long context text embedder_. arXiv. https://arxiv.org/abs/2402.01613 (consultado el _AAAA-MM-DD_).
-4. Ollama. (s. f.). _nomic-embed-text_. Ollama Library. https://ollama.com/library/nomic-embed-text (consultado el _AAAA-MM-DD_).
+1. LangChain. (s. f.). _Text splitters_. LangChain Docs. https://python.langchain.com/docs/concepts/text_splitters/ (consultado el 2026-11-17).
+2. Pinecone. (s. f.). _Chunking strategies for LLM applications_. Pinecone Learn. https://www.pinecone.io/learn/chunking-strategies/ (consultado el 2026-11-17).
+3. Nussbaum, Z., Morris, J. X., Duderstadt, B. y Mulyar, A. (2024). _Nomic Embed: Training a reproducible long context text embedder_. arXiv. https://arxiv.org/abs/2402.01613 (consultado el 2026-11-17).
+4. Ollama. (s. f.). _nomic-embed-text_. Ollama Library. https://ollama.com/library/nomic-embed-text (consultado el 2026-11-17).
 
 ## Anexos
 
@@ -282,5 +282,5 @@ Fallos y resultados que no siguen la tendencia:
 - [x] Los resultados incluyen lo que no salió como se esperaba.
 - [x] La conclusión no afirma más de lo que muestran los datos.
 - [x] Las limitaciones están dichas con claridad.
-- [ ] Toda afirmación externa tiene su referencia. _Faltan las fechas de consulta._
+- [x] Toda afirmación externa tiene su referencia.
 - [x] El resumen se entiende sin leer el resto.

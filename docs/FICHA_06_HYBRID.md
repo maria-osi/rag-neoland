@@ -7,7 +7,7 @@
 | Autores | Maria |
 | Fecha | 2026-11-17 |
 | Versión | v1 |
-| Estado | borrador |
+| Estado | cerrada |
 | Pregunta nº | 6 |
 
 ## Resumen (máx. 150 palabras)

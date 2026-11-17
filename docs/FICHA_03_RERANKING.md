@@ -7,12 +7,12 @@
 | Autores | Maria |
 | Fecha | 2026-11-17 |
 | Versión | v1 |
-| Estado | borrador |
+| Estado | cerrada |
 | Pregunta nº | 3 |
 
 ## Resumen (máx. 150 palabras)
 
-Si reordenar los resultados con un reranker mejora lo que llega al agente, y a qué coste de latencia, con nomic-embed-text, Qdrant, troceo por estructura 1500/200, k=4 y las 32 preguntas A-D del golden set. Se recuperaron 20 candidatos y se reordenaron con dos cross-encoders locales, `ms-marco-MiniLM-L-6-v2` y `bge-reranker-base`. MiniLM-L6 sube la evidencia entre los 4 primeros de 19 a 22 preguntas, mantiene el acierto por fuente y añade 119 ms por pregunta; cumple el criterio fijado antes de medir. bge-reranker-base llega a 23, pero tarda 502,2 ms frente a un límite de 500 ms: no cumple por 2,2 ms en una sola ejecución. Se adopta MiniLM-L6, de forma provisional. Los dos rerankers bajan el acierto en la posición 1, y los dos dan a las preguntas sin respuesta un score por debajo de todas las A-D.
+Si reordenar los resultados con un reranker mejora lo que llega al agente, y a qué coste de latencia, con nomic-embed-text, Qdrant, troceo por estructura 1500/200, k=4 y las 32 preguntas A-D del golden set. Se recuperaron 20 candidatos y se reordenaron con dos cross-encoders locales, `ms-marco-MiniLM-L-6-v2` y `bge-reranker-base`. MiniLM-L6 sube la evidencia entre los 4 primeros de 19 a 22 preguntas, mantiene el acierto por fuente y añade 119 ms por pregunta; cumple el criterio fijado antes de medir. bge-reranker-base llega a 23, pero tarda 502,2 ms frente a un límite de 500 ms: no cumple por 2,2 ms en una sola ejecución. Se adopta MiniLM-L6. Los dos rerankers bajan el acierto en la posición 1, y los dos dan a las preguntas sin respuesta un score por debajo de todas las A-D.
 
 ## 1. Introducción
 
@@ -170,7 +170,7 @@ Fallos y resultados que no siguen la tendencia:
 
 | Campo | Contenido |
 |---|---|
-| Decisión | Reranking con `cross-encoder/ms-marco-MiniLM-L-6-v2` sobre 20 candidatos, quedándose con 4, de forma provisional. |
+| Decisión | Reranking con `cross-encoder/ms-marco-MiniLM-L-6-v2` sobre 20 candidatos, quedándose con 4. |
 | Motivo principal | Cumple el criterio fijado antes de medir: trae la evidencia entre los 4 primeros en 22 de 32 preguntas frente a 19 sin reranking, acierta la fuente en 30 frente a 29 y añade 119,4 ms de reranking por pregunta. |
 | Alternativas descartadas | Sin reranking: 3 preguntas menos por evidencia. `BAAI/bge-reranker-base`: 23 por evidencia, pero 502,2 ms de reranking frente a un límite de 500 ms; no cumple por 2,2 ms en una sola ejecución. Además baja la categoría C y el hit@1. |
 | Coste o riesgo asumido | Unos 120 ms más por pregunta en `mps:0` y un modelo de 90,9 MB que se descarga de Hugging Face la primera vez y se carga al arrancar. El primer resultado acierta menos (11 frente a 13 por evidencia). 10 de 32 preguntas siguen sin traer la evidencia entre los 4 primeros. |
@@ -186,10 +186,10 @@ Fallos y resultados que no siguen la tendencia:
 
 ## 8. Referencias
 
-1. Sentence Transformers. (s. f.). _Retrieve & Re-Rank_. Sentence Transformers Documentation. https://www.sbert.net/examples/applications/retrieve_rerank/README.html (consultado el _AAAA-MM-DD_).
-2. Sentence Transformers. (s. f.). _cross-encoder/ms-marco-MiniLM-L-6-v2_ [Ficha del modelo]. Hugging Face. https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-6-v2 (consultado el _AAAA-MM-DD_).
-3. BAAI. (2023). _bge-reranker-base_ [Ficha del modelo]. Hugging Face. https://huggingface.co/BAAI/bge-reranker-base (consultado el _AAAA-MM-DD_).
-4. Nogueira, R. y Cho, K. (2019). _Passage re-ranking with BERT_. arXiv. https://arxiv.org/abs/1901.04085 (consultado el _AAAA-MM-DD_).
+1. Sentence Transformers. (s. f.). _Retrieve & Re-Rank_. Sentence Transformers Documentation. https://www.sbert.net/examples/applications/retrieve_rerank/README.html (consultado el 2026-11-17).
+2. Sentence Transformers. (s. f.). _cross-encoder/ms-marco-MiniLM-L-6-v2_ [Ficha del modelo]. Hugging Face. https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-6-v2 (consultado el 2026-11-17).
+3. BAAI. (2023). _bge-reranker-base_ [Ficha del modelo]. Hugging Face. https://huggingface.co/BAAI/bge-reranker-base (consultado el 2026-11-17).
+4. Nogueira, R. y Cho, K. (2019). _Passage re-ranking with BERT_. arXiv. https://arxiv.org/abs/1901.04085 (consultado el 2026-11-17).
 
 ## Anexos
 
@@ -209,5 +209,5 @@ Fallos y resultados que no siguen la tendencia:
 - [x] Los resultados incluyen lo que no salió como se esperaba.
 - [x] La conclusión no afirma más de lo que muestran los datos.
 - [x] Las limitaciones están dichas con claridad.
-- [ ] Toda afirmación externa tiene su referencia. _Faltan las fechas de consulta._
+- [x] Toda afirmación externa tiene su referencia.
 - [x] El resumen se entiende sin leer el resto.

@@ -7,7 +7,7 @@
 | Autores | Maria |
 | Fecha | 2026-11-17 |
 | Versión | v1 |
-| Estado | borrador |
+| Estado | cerrada |
 | Pregunta nº | 4 |
 
 ## Resumen (máx. 150 palabras)
@@ -153,7 +153,7 @@ Fallos y resultados que no siguen la tendencia:
 
 | Campo | Contenido |
 |---|---|
-| Decisión | k=4 (sin cambio respecto a la configuración base), de forma provisional. |
+| Decisión | k=4 (sin cambio respecto a la configuración base). |
 | Motivo principal | Ningún k menor cumple el criterio fijado antes de medir: k=1 y k=2 pierden 6 y 4 preguntas por evidencia respecto a k=4 (13 y 15 frente a 19) y aciertan menos en A y en C. |
 | Alternativas descartadas | k=1 y k=2: hipótesis de partida, refutada por la tabla 3. k=8: acierta 3 preguntas más por evidencia (22 frente a 19) con 1,8 veces el contexto (10 723 frente a 5 926 caracteres); el criterio busca el k más pequeño y no lo considera. |
 | Coste o riesgo asumido | Unos 5 900 caracteres de contexto por pregunta de media, más si se recupera uno de los chunks largos de la ficha 5. 13 de 32 preguntas siguen sin traer la evidencia entre los 4 primeros, y la categoría D no la trae en ninguna. |
@@ -167,8 +167,8 @@ Fallos y resultados que no siguen la tendencia:
 
 ## 8. Referencias
 
-1. Liu, N. F., Lin, K., Hewitt, J., Paranjape, A., Bevilacqua, M., Petroni, F. y Liang, P. (2023). _Lost in the middle: How language models use long contexts_. arXiv. https://arxiv.org/abs/2307.03172 (consultado el _AAAA-MM-DD_).
-2. Qdrant. (s. f.). _Indexing_. Qdrant Documentation. https://qdrant.tech/documentation/concepts/indexing/ (consultado el _AAAA-MM-DD_).
+1. Liu, N. F., Lin, K., Hewitt, J., Paranjape, A., Bevilacqua, M., Petroni, F. y Liang, P. (2023). _Lost in the middle: How language models use long contexts_. arXiv. https://arxiv.org/abs/2307.03172 (consultado el 2026-11-17).
+2. Qdrant. (s. f.). _Indexing_. Qdrant Documentation. https://qdrant.tech/documentation/concepts/indexing/ (consultado el 2026-11-17).
 
 ## Anexos
 
