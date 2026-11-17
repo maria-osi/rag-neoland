@@ -1,7 +1,7 @@
 """Funciones puras (sin red) del notebook 05_comparar_embeddings_bases.
 
 Troceo del corpus (por tamaño fijo y por estructura Markdown), jsonl de chunks, lectura del golden set y de sus evidencias,
-prefijos por modelo y métricas de recuperación.
+prefijos por modelo, métricas de recuperación y reordenado por reranker con su criterio de decisión.
 """
 import json
 import re
@@ -364,3 +364,48 @@ def calcular_metricas(rangos: list[int | None], k: int = 4) -> dict:
         f"hit@{k}": len(en_k) / n,
         "mrr": sum(1 / r for r in en_k) / n,
     }
+
+
+def reordenar_por_score(candidatos: list[dict], scores: list[float], k: int) -> list[dict]:
+    """Los `k` candidatos de mayor score; en los empates conserva el orden de la búsqueda."""
+    if k < 1:
+        raise ValueError(f"k debe ser al menos 1, y es {k}")
+    if len(scores) != len(candidatos):
+        raise ValueError(
+            f"hay {len(scores)} scores para {len(candidatos)} candidatos"
+        )
+    pares = sorted(zip(candidatos, scores), key=lambda par: par[1], reverse=True)
+    return [candidato for candidato, _ in pares[:k]]
+
+
+def elegir_reranker(
+    referencia: dict,
+    opciones: list[dict],
+    mejora_minima: int,
+    latencia_maxima_ms: float,
+) -> tuple[list[dict], str | None]:
+    """Aplica el criterio de decisión sobre aciertos contados.
+
+    `referencia` es {"ev_aciertos", "aciertos"}; cada opción trae además "nombre" y "latencia_ms"
+    (latencia de reranking media). Devuelve una fila por opción y el nombre del ganador, o None.
+    """
+    filas = []
+    for opcion in opciones:
+        mejora = opcion["ev_aciertos"] - referencia["ev_aciertos"]
+        fuente_no_baja = opcion["aciertos"] >= referencia["aciertos"]
+        latencia_ok = opcion["latencia_ms"] < latencia_maxima_ms
+        filas.append(
+            {
+                "nombre": opcion["nombre"],
+                "mejora_ev": mejora,
+                "fuente_no_baja": fuente_no_baja,
+                "latencia_ok": latencia_ok,
+                "cumple": mejora >= mejora_minima and fuente_no_baja and latencia_ok,
+            }
+        )
+    por_nombre = {opcion["nombre"]: opcion for opcion in opciones}
+    cumplen = [por_nombre[fila["nombre"]] for fila in filas if fila["cumple"]]
+    if not cumplen:
+        return filas, None
+    ganador = min(cumplen, key=lambda o: (-o["ev_aciertos"], o["latencia_ms"]))
+    return filas, ganador["nombre"]
