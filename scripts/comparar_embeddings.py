@@ -302,24 +302,40 @@ def leer_k_minimo(ruta: Path) -> dict[str, str]:
     return resultado
 
 
-def leer_evidencias(ruta: Path) -> dict[str, dict[str, str]]:
-    """Lee el json de evidencias: {ID: {fuente: subcadena}}. Ignora las claves que empiezan por `_`."""
+def leer_evidencias(ruta: Path) -> dict[str, dict[str, list[str]]]:
+    """Lee el json de evidencias: {ID: {fuente: [subcadena, ...]}}. Ignora las claves que empiezan por `_`."""
     datos = json.loads(Path(ruta).read_text(encoding="utf-8"))
-    return {id_: valor for id_, valor in datos.items() if not id_.startswith("_")}
+    evidencias = {id_: valor for id_, valor in datos.items() if not id_.startswith("_")}
+    for id_, por_fuente in evidencias.items():
+        for fuente, subcadenas in por_fuente.items():
+            if not isinstance(subcadenas, list):
+                raise ValueError(
+                    f"Evidencias de {id_} / {fuente}: se esperaba una lista de subcadenas"
+                )
+            if not subcadenas or not all(
+                isinstance(s, str) and s for s in subcadenas
+            ):
+                raise ValueError(
+                    f"Evidencias de {id_} / {fuente}: la lista debe tener subcadenas no vacías"
+                )
+    return evidencias
 
 
 def evidencias_fuera_de_chunks(
-    evidencias: dict[str, dict[str, str]], chunks: list[dict]
+    evidencias: dict[str, dict[str, list[str]]], chunks: list[dict]
 ) -> list[tuple[str, str]]:
-    """Pares (ID, fuente) cuya subcadena no cabe entera en ningún chunk de esa fuente."""
+    """Pares (ID, fuente), una vez cada uno, con alguna subcadena que no cabe entera en ningún chunk de esa fuente."""
     textos: dict[str, list[str]] = {}
     for chunk in chunks:
         textos.setdefault(chunk["fuente"], []).append(chunk["texto"])
     return [
         (id_, fuente)
         for id_, por_fuente in evidencias.items()
-        for fuente, subcadena in por_fuente.items()
-        if not any(subcadena in texto for texto in textos.get(fuente, []))
+        for fuente, subcadenas in por_fuente.items()
+        if any(
+            not any(subcadena in texto for texto in textos.get(fuente, []))
+            for subcadena in subcadenas
+        )
     ]
 
 
@@ -340,15 +356,15 @@ def rango_primer_acierto(recuperadas: list[str], esperadas: list[str]) -> int | 
 
 
 def rango_primer_acierto_evidencia(
-    recuperados: list[dict], evidencias: dict[str, str]
+    recuperados: list[dict], evidencias: dict[str, list[str]]
 ) -> int | None:
-    """Posición (desde 1) del primer chunk de una fuente esperada que contiene su evidencia.
+    """Posición (desde 1) del primer chunk de una fuente esperada que contiene alguna de sus evidencias.
 
-    `recuperados` son {"fuente", "texto"}; `evidencias` es {fuente: subcadena}.
+    `recuperados` son {"fuente", "texto"}; `evidencias` es {fuente: [subcadena, ...]}.
     """
     for posicion, chunk in enumerate(recuperados, start=1):
-        subcadena = evidencias.get(chunk["fuente"])
-        if subcadena is not None and subcadena in chunk["texto"]:
+        subcadenas = evidencias.get(chunk["fuente"])
+        if subcadenas is not None and any(s in chunk["texto"] for s in subcadenas):
             return posicion
     return None
 

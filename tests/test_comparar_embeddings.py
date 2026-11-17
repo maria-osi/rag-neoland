@@ -1,4 +1,6 @@
 """Tests de scripts/comparar_embeddings.py (escenarios 1-8 de la issue #5, 1-5 de la #7 y 1-9 de la #11)."""
+import csv
+import json
 import shutil
 from pathlib import Path
 
@@ -9,6 +11,7 @@ import comparar_embeddings as ce
 RAIZ = Path(__file__).resolve().parent.parent
 GOLDEN = RAIZ / "docs" / "GOLDEN_SET_PYTHON_DOCS.md"
 EVIDENCIAS = RAIZ / "docs" / "golden_set_evidencias.json"
+VALIDACION = RAIZ / "data" / "resultados" / "validacion_final.csv"
 CORPUS = RAIZ / "data" / "python-docs-3.15" / "python-3.15-docs-md-clean"
 
 
@@ -87,20 +90,79 @@ def test_evidencias_caben_en_chunks_de_500():
     assert ce.evidencias_fuera_de_chunks(evidencias, chunks) == []
 
 
-def test_evidencia_partida_se_detecta():
-    chunks = [{"fuente": "a.md", "texto": "hola mu"}, {"fuente": "a.md", "texto": "ndo"}]
-    assert ce.evidencias_fuera_de_chunks({"X01": {"a.md": "mundo"}}, chunks) == [("X01", "a.md")]
+def test_evidencias_son_listas_no_vacias():
+    """Escenario 4: cada valor es una lista no vacía de cadenas no vacías."""
+    evidencias = ce.leer_evidencias(EVIDENCIAS)
+    assert evidencias
+    for id_, por_fuente in evidencias.items():
+        for fuente, subcadenas in por_fuente.items():
+            assert isinstance(subcadenas, list) and subcadenas, (id_, fuente)
+            assert all(isinstance(s, str) and s for s in subcadenas), (id_, fuente)
 
 
-def test_rango_primer_acierto_evidencia():
-    evidencias = {"a.md": "clave", "b.md": "otra"}
+def test_alternativa_partida_se_detecta():
+    """Escenario 3: solo la primera subcadena cabe entera; el par sale una vez."""
+    chunks = [{"fuente": "a.md", "texto": "hola mu"}, {"fuente": "a.md", "texto": "ndo hola"}]
+    evidencias = {"X01": {"a.md": ["hola", "mundo"]}}
+    assert ce.evidencias_fuera_de_chunks(evidencias, chunks) == [("X01", "a.md")]
+    assert ce.evidencias_fuera_de_chunks({"X01": {"a.md": ["hola", "ndo"]}}, chunks) == []
+
+
+def test_rango_primer_acierto_evidencia_con_varias():
+    """Escenarios 1 y 2 y CB-03."""
+    evidencias = {"a.md": ["clave", "otra"]}
     recuperados = [
-        {"fuente": "x.md", "texto": "clave"},       # fuente equivocada
-        {"fuente": "a.md", "texto": "sin dato"},    # fuente buena sin evidencia
-        {"fuente": "b.md", "texto": "la otra cosa"},
+        {"fuente": "a.md", "texto": "sin dato"},    # fuente buena sin ninguna
+        {"fuente": "x.md", "texto": "clave"},       # fuente equivocada con la primera
+        {"fuente": "a.md", "texto": "la otra cosa"},  # fuente buena con la segunda
     ]
     assert ce.rango_primer_acierto_evidencia(recuperados, evidencias) == 3
     assert ce.rango_primer_acierto_evidencia(recuperados[:2], evidencias) is None
+    assert ce.rango_primer_acierto_evidencia([recuperados[1]], evidencias) is None
+
+
+def test_leer_evidencias_rechaza_valores_invalidos(tmp_path):
+    """CB-01 y CB-02: valor que no es lista, lista vacía o con cadena vacía."""
+    casos = {
+        "no lista": {"X01": {"a.md": "cadena"}},
+        "lista vacía": {"X01": {"a.md": []}},
+        "cadena vacía": {"X01": {"a.md": ["ok", ""]}},
+    }
+    for nombre, datos in casos.items():
+        ruta = tmp_path / "e.json"
+        ruta.write_text(json.dumps(datos), encoding="utf-8")
+        with pytest.raises(ValueError, match="X01") as error:
+            ce.leer_evidencias(ruta)
+        assert "a.md" in str(error.value), nombre
+    ruta.write_text(json.dumps({"_descripcion": "x", "X01": {"a.md": ["ok"]}}), encoding="utf-8")
+    assert ce.leer_evidencias(ruta) == {"X01": {"a.md": ["ok"]}}
+
+
+_ANTERIOR = {
+    "A01": (None, None), "A02": (3, 3), "A03": (3, 3), "A05": (1, 1), "A07": (1, 1),
+    "A08": (1, 3), "A09": (1, 1), "B02": (1, 1), "B03": (1, 1), "B04": (2, 2),
+    "B05": (2, 2), "B06": (1, 2), "B07": (1, 1), "B09": (1, 1), "B10": (1, 1),
+    "C01": (1, None), "C02": (2, 2), "C04": (1, 1), "C05": (2, 2), "C06": (1, 1),
+    "C07": (1, 3), "C08": (2, 2), "C09": (1, 2), "D01": (1, 1), "D02": (None, None),
+    "D03": (1, None),
+}
+
+
+def test_validacion_final_cuenta_alternativas():
+    """Escenario 5: el CSV regenerado cuenta las alternativas y conserva el resto."""
+    with open(VALIDACION, encoding="utf-8", newline="") as f:
+        filas = {fila["id"]: fila for fila in csv.DictReader(f)}
+
+    def rango(id_, columna):
+        valor = filas[id_][columna]
+        return int(float(valor)) if valor else None
+
+    for id_ in ("A04", "A06", "A10", "C03"):
+        assert rango(id_, "rango evidencia") in (1, 2, 3, 4), id_
+    for id_ in ("B01", "B08"):
+        assert rango(id_, "rango evidencia") is None, id_
+    for id_, (fuente, evidencia) in _ANTERIOR.items():
+        assert (rango(id_, "rango fuente"), rango(id_, "rango evidencia")) == (fuente, evidencia), id_
 
 
 def test_calcula_hit_y_mrr():
