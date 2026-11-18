@@ -1,11 +1,11 @@
 # Comparativa consolidada y decisiones del RAG
 
-> Documento final de la investigación definida en [TAREA_RAG_A_TEMPO.md](TAREA_RAG_A_TEMPO.md). Reúne las seis fichas, la validación con la configuración completa y las decisiones que debe aplicar el workflow.
+> Documento final de la investigación definida en [TAREA_RAG_A_TEMPO.md](TAREA_RAG_A_TEMPO.md). Reúne las seis fichas, la ficha 7 sobre filtros por metadatos, la ficha 8 sobre modelos de embeddings con la configuración final, la validación con la configuración completa y las decisiones que debe aplicar el workflow.
 
 | Campo | Valor |
 |---|---|
 | Autora | Maria |
-| Fecha de cierre | 2026-11-17 |
+| Fecha de cierre | 2026-11-18 |
 | Corpus | Documentación limpia de Python 3.15 |
 | Golden set | 35 preguntas: 32 evaluables A-D y 3 sin respuesta E |
 | Estado | Cerrado |
@@ -15,6 +15,8 @@
 El RAG final usa **Qdrant**, embeddings **nomic-embed-text**, troceo de Markdown por estructura con máximo 1500 y mínimo 200, recuperación de **20 candidatos**, reranking local con **MiniLM-L6** y entrega de los **4 mejores chunks**. No se incorpora búsqueda híbrida BM25 porque, una vez aplicado el reranker, solo mejora una pregunta por evidencia y el umbral exigía dos.
 
 En la validación final, esta configuración recupera una fuente correcta entre los cuatro primeros en **30 de 32 preguntas (hit@4 0,938)** y un chunk con alguna de las evidencias literales de la pregunta en **26 de 32 (ev_hit@4 0,813)**. La latencia total media fue **918,3 ms**, en Windows con el reranker en CPU; la validación anterior, con el reranker en MPS, dio 153,7 ms (ver la sección 7).
+
+Cada chunk guarda en el payload seis metadatos calculados del corpus, y la consulta acepta filtros por `modulo` y `tipo_pagina`. El agente pasa **`modulo`** cuando lo conoce por sus `import`, con la repetición sin filtro por defecto; no pasa `tipo_pagina`. Con el filtro perfecto por `modulo` sacado del golden set y repetición, la recuperación sube a **31 de 32 fuentes y 28 de 32 evidencias** en el top 4 (sección 3.7).
 
 ## 2. Configuración final
 
@@ -32,6 +34,9 @@ En la validación final, esta configuración recupera una fuente correcta entre 
 | Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | Resultado final | 4 chunks |
 | Búsqueda híbrida | No; solo búsqueda densa |
+| Metadatos en el payload | `modulo`, `tipo_pagina`, `simbolos`, `deprecated`, `added_in`, `tiene_codigo`; índices keyword en `modulo` y `tipo_pagina` |
+| Filtros | `modulo` cuando el agente lo conoce; `tipo_pagina` no se recomienda |
+| Repetición sin filtro | Umbral 0,0 en score de reranking (`UMBRAL_REPETICION`) |
 | Paso reutilizable | `scripts/consultar_rag.py` |
 
 ## 3. Comparativa total de decisiones
@@ -49,6 +54,23 @@ Se compararon MiniLM, BGE y nomic sobre Qdrant y Chroma con chunks fijos de 500 
 **Decisión:** nomic. La ventaja inicial era pequeña y la métrica por evidencia estaba limitada por el chunking; por eso se confirmó después con la configuración estructurada.
 
 Ficha: [FICHA_01_EMBEDDINGS.md](FICHA_01_EMBEDDINGS.md).
+
+Con la configuración final (troceo por estructura 1500/200 sin ruta, 20 candidatos, MiniLM-L6, top 4 y varias evidencias por fuente) se compararon cinco modelos más frente a nomic, cada uno en su colección y con los prefijos de su ficha oficial. La tabla da la configuración que decide: con reranker y filtro perfecto por `modulo` con repetición. Latencias con el reranker en `cuda`, no comparables con las de las otras secciones.
+
+| Modelo | Proveedor | `num_ctx` | Truncados | hit@4 | ev_hit@4 | Latencia media | Indexación |
+|---|---|---:|---:|---:|---:|---:|---:|
+| **nomic-embed-text** | Ollama | 2048 | 42 | 31/32 | **28/32** | 105,7 ms | 228,2 s\* |
+| qwen3-embedding:0.6b | Ollama | 8192 | 2 | 31/32 | 27/32 | 109,8 ms | 261,4 s |
+| qwen3-embedding:8b | Ollama (`cuda+cpu`) | 8192 | 2 | 32/32 | **28/32** | 256,1 ms | 1 573,4 s |
+| bge-m3 (denso) | Ollama | 8192 | 3 | 32/32 | **28/32** | 117,3 ms | 276,3 s |
+| embeddinggemma | Ollama | 2048 | 47 | 32/32 | 27/32 | 151,2 ms | 247,4 s |
+| jina-code-embeddings-1.5b | `sentence-transformers` | 8192 | 2 | 31/32 | 25/32 | 106,0 ms | 1 814,9 s |
+
+\* La indexación de nomic no se repitió: es la de `troceo_estructura.csv`, medida en un MacBook M2 Pro ([ficha 5](FICHA_05_CHUNK_SIZE.md)), y no se compara con los otros tiempos de la tabla.
+
+**Decisión:** se mantiene nomic. El criterio fijado antes de medir exigía ev_hit@4 ≥ 30/32 sin bajar hit@4 de 31/32, y ningún modelo pasa de 28/32 evidencias. Sin reranker, embeddinggemma logra 28/32 evidencias con y sin filtro, pero el criterio no evalúa esa configuración.
+
+Ficha: [FICHA_08_MODELOS_EMBEDDING.md](FICHA_08_MODELOS_EMBEDDING.md).
 
 ### 3.2 Base vectorial
 
@@ -140,6 +162,23 @@ Ficha: [FICHA_03_RERANKING.md](FICHA_03_RERANKING.md).
 
 Ficha: [FICHA_06_HYBRID.md](FICHA_06_HYBRID.md).
 
+### 3.7 Filtros por metadatos
+
+Se midió la configuración final sin filtro y con filtro por `modulo` o por `tipo_pagina`, uno cada vez. El filtro perfecto sale de las fuentes esperadas del golden set; el equivocado, de una regla fija (el módulo de otra pregunta, o `c-api`/`library`). «Con repetición» usa el umbral por defecto 0,0. El filtro por `modulo` se aplica a 22 de 32 preguntas; las otras 10 no tienen módulo en su fuente y van sin filtro. Las métricas por evidencia usan varias evidencias por fuente, como la sección 4.
+
+| Configuración | hit@4 | ev_hit@4 | Repeticiones | Latencia media |
+|---|---:|---:|---:|---:|
+| Sin filtro | 30/32 | 26/32 | — | 1 018,8 ms |
+| **`modulo` perfecto, sin repetición** | **32/32** | **29/32** | 0 | 892,8 ms |
+| `modulo` perfecto, con repetición | 31/32 | 28/32 | 1 | 900,5 ms |
+| `modulo` equivocado, con repetición | 29/32 | 26/32 | 20 de 22 | 1 459,3 ms |
+| `tipo_pagina` perfecto, sin repetición | 30/32 | 26/32 | 0 | 1 004,2 ms |
+| `tipo_pagina` equivocado, con repetición | 19/32 | 15/32 | 21 de 32 | 1 576,8 ms |
+
+**Decisión:** el agente pasa `modulo` con la repetición por defecto; no pasa `tipo_pagina`. `modulo` cumple el criterio fijado antes de medir (ev_hit@4 ≥ 27 y hit@4 ≥ 30 con filtro perfecto; ev_hit@4 ≥ 23 con filtro equivocado y repetición). `tipo_pagina` no mejora el top 4 con filtro perfecto (26 < 27) y la repetición no lo protege de un filtro equivocado (15 < 23). La repetición cuesta D02 con el filtro perfecto por `modulo`. El efecto real depende de que el agente acierte el módulo; no se ha medido con un agente.
+
+Ficha: [FICHA_07_FILTROS_METADATOS.md](FICHA_07_FILTROS_METADATOS.md).
+
 ## 4. Validación de la configuración completa
 
 El script [validar_rag_final.py](../scripts/validar_rag_final.py) ejecutó las 35 preguntas a través del mismo módulo que usará el agente.
@@ -161,20 +200,53 @@ Datos: `data/resultados/validacion_final.csv`.
 
 ## 5. Paso «consultar el RAG»
 
-El módulo [consultar_rag.py](../scripts/consultar_rag.py) carga una vez el cliente de Qdrant, Ollama y el reranker. Por consulta:
+El módulo [consultar_rag.py](../scripts/consultar_rag.py) carga una vez el cliente de Qdrant, Ollama y el reranker, este en el dispositivo de `dispositivo()`: `cuda` en Windows con GPU NVIDIA, `mps` en macOS y `cpu` en otro caso. Por consulta:
 
-1. Recibe una pregunta en inglés.
+1. Recibe una pregunta en inglés y, opcionalmente, `filtros`.
 2. Añade el prefijo `search_query: ` y obtiene el embedding con nomic.
-3. Consulta Qdrant y recupera 20 candidatos.
+3. Consulta Qdrant y recupera 20 candidatos. Con filtros, solo entre los chunks que los cumplen.
 4. Puntúa los pares `(pregunta, texto)` con MiniLM-L6.
 5. Ordena por score de reranking.
-6. Devuelve los 4 mejores chunks con fuente, texto y scores.
+6. Con filtros, si no hay candidatos o ninguno llega a `umbral` en score de reranking, repite los pasos 3 a 5 sin filtro con el mismo vector.
+7. Devuelve los 4 mejores chunks.
+
+`filtros` es un diccionario con las claves `modulo` y `tipo_pagina`. Cada valor es un texto o una lista de textos: una lista acepta cualquiera de sus valores y las dos claves se combinan con Y. Una clave distinta, un valor vacío o un elemento que no es texto lanzan `ValueError` antes de calcular el embedding. `{}` y `None` equivalen a consultar sin filtros, que hace la misma llamada a Qdrant que antes de añadir los filtros.
+
+`umbral` vale por defecto `UMBRAL_REPETICION = 0.0`. Con `umbral=None` la consulta filtrada no se repite y puede devolver una lista vacía.
+
+Cada chunk devuelto lleva:
+
+| Campo | Contenido |
+|---|---|
+| `id`, `fuente`, `texto`, `ruta_titulos` | Payload del chunk |
+| `score_vectorial`, `score_reranking` | Scores de Qdrant y de MiniLM-L6 |
+| `modulo` | Módulo de Python de la página (`logging.config`, `asyncio`); vacío si la página no documenta un módulo |
+| `tipo_pagina` | Primera carpeta de `fuente` (`library`, `tutorial`, `whatsnew`…); vacío si no tiene carpeta |
+| `simbolos` | Nombres de las entradas de definición del chunk, cualificados con su padre (`asyncio.TaskGroup.create_task`) |
+| `deprecated` | Verdadero si el chunk tiene una línea `Deprecated since version` |
+| `added_in` | Versiones de las líneas `Added in version X.Y` |
+| `tiene_codigo` | Verdadero si el chunk tiene un bloque de código |
+| `filtrado` | Verdadero si el chunk salió de la búsqueda con filtro; falso sin filtros o tras repetir sin filtro |
+
+Los seis metadatos los calcula [metadatos.py](../scripts/metadatos.py) a partir del corpus y los escribe en el payload de la colección [anadir_metadatos.py](../scripts/anadir_metadatos.py), sin recalcular vectores. Si la colección no los tiene, `ConsultorRAG.local()` para y pide ejecutar:
+
+```bash
+uv run python scripts/anadir_metadatos.py
+```
 
 Uso directo:
 
 ```bash
 uv run python scripts/consultar_rag.py "How does asyncio.TaskGroup work?"
+uv run python scripts/consultar_rag.py "How does asyncio.TaskGroup work?" --modulo asyncio
+uv run python scripts/consultar_rag.py "How do I create a virtual environment?" --tipo-pagina tutorial --tipo-pagina library
 ```
+
+`--modulo` y `--tipo-pagina` se pueden repetir y se pasan como `filtros` con el umbral por defecto.
+
+Para medir otros modelos, `ConsultorRAG.local(coleccion, modelo)` acepta otra colección y otra clave de `MODELOS` (por defecto `COLECCION` y `MODELO`, los de la configuración final), y `consultar(..., reordenar=False)` devuelve los 4 primeros de la búsqueda sin reranker, con `score_reranking` a `None`; con filtros y sin reranker, la búsqueda solo se repite sin filtro si la filtrada no trae candidatos. El agente usa los valores por defecto.
+
+El agente pasa `modulo` cuando conoce el módulo por sus `import` y deja el umbral por defecto. No pasa `tipo_pagina`: el filtro existe, pero no mejora la recuperación y un valor equivocado no siempre se repite sin filtro (sección 3.7).
 
 En un workflow asíncrono con varios agentes debe usarse `AsyncQdrantClient` o ejecutar el adaptador síncrono fuera del event loop. El benchmark de la ficha 2 ya valida el cliente asíncrono con ocho conexiones.
 
@@ -213,12 +285,14 @@ El reranker separó las tres preguntas E de las A-D en este golden set, pero tre
 - Un solo corpus, de Python 3.15 y en inglés.
 - 32 preguntas evaluables; una pregunta cambia una proporción en 0,031.
 - La mayoría de experimentos se ejecutó una vez; las latencias dependen de caché, orden y hardware.
-- Las fichas midieron el reranker en MPS de Apple. La validación final, en Windows con el reranker en CPU, dio 918,3 ms de latencia total media frente a 153,7 ms de la validación anterior en MPS. No se midió el mismo equipo con los dos dispositivos, así que el peso del dispositivo en esa diferencia es una hipótesis. Un servidor dará otra cifra.
+- La ficha 3 midió el reranker en MPS de Apple; las fichas 5 y 7 y la validación final, en Windows con el reranker en CPU. La validación final dio 918,3 ms de latencia total media frente a 153,7 ms de la validación anterior en MPS. No se midió el mismo equipo con los dos dispositivos, así que el peso del dispositivo en esa diferencia es una hipótesis. Un servidor dará otra cifra.
+- Desde la issue #28, en Windows `torch` se instala con CUDA (2.14.1+cu130) y `ConsultorRAG.local()` crea el reranker en `dispositivo()`: `cuda` en Windows con GPU NVIDIA, `mps` en macOS y `cpu` en otro caso. La validación final no se repitió: sus 918,3 ms siguen siendo una medida con el reranker en CPU. Las latencias de la ficha 8 se midieron con el reranker en `cuda` y no se comparan con las de la validación ni con las de las fichas anteriores.
 - La evidencia literal solo acepta las subcadenas listadas en el json: un chunk correcto con una redacción que no está en la lista cuenta como fallo.
 - No se evaluó la respuesta generada por el LLM, solo la recuperación.
 - La comparación de bases fue local, caliente y solo de lectura; no cubre escrituras, red, réplicas ni fallos.
 - La configuración final tiene 773 de 7 955 chunks por encima de 1 500 caracteres; 709 no son un bloque de código y el mayor tiene 203 072. El troceo con límite duro los reduce a 69 bloques de código, pero no se adoptó (sección 3.3).
 - La traducción español → inglés y la respuesta final en español se delegan al agente y no se midieron aquí.
+- El filtro «perfecto» por `modulo` sale de la fuente esperada del golden set. Mide el techo con un agente que siempre acierta el módulo; cuánto acierta un agente real no se ha medido. El umbral de repetición 0,0 sale de `validacion_final.csv` y no se ajustó con el golden set.
 
 ## 8. Cuándo revisar las decisiones
 
@@ -231,7 +305,8 @@ Repetir la evaluación si ocurre cualquiera de estas condiciones:
 - el corpus supera claramente el tamaño controlado actual;
 - se requiere escritura concurrente, alta disponibilidad o despliegue distribuido;
 - se adopta otro reranker o se reduce el presupuesto de latencia;
-- se quiere fijar un umbral de «no hay respuesta».
+- se quiere fijar un umbral de «no hay respuesta»;
+- se evalúa con un agente real que elige los filtros o se quiere filtrar por otro metadato.
 
 ## 9. Artefactos finales
 
@@ -244,10 +319,15 @@ Repetir la evaluación si ocurre cualquiera de estas condiciones:
 | Ficha 4 | [FICHA_04_NUMERO_K.md](FICHA_04_NUMERO_K.md) |
 | Ficha 5 | [FICHA_05_CHUNK_SIZE.md](FICHA_05_CHUNK_SIZE.md) |
 | Ficha 6 | [FICHA_06_HYBRID.md](FICHA_06_HYBRID.md) |
+| Ficha 7 | [FICHA_07_FILTROS_METADATOS.md](FICHA_07_FILTROS_METADATOS.md) |
+| Ficha 8 | [FICHA_08_MODELOS_EMBEDDING.md](FICHA_08_MODELOS_EMBEDDING.md) |
 | Benchmark de bases | `scripts/comparar_bases_vectoriales.py` y `data/resultados/bases_vectoriales.csv` |
+| Metadatos del payload | `scripts/metadatos.py` (cálculo) y `scripts/anadir_metadatos.py` (carga en Qdrant) |
+| Comparación de filtros | `notebooks/12_comparar_filtros_metadatos.ipynb`, `data/resultados/filtros_metadatos.csv` y `data/resultados/filtros_metadatos_por_pregunta.csv` |
+| Comparación de modelos de embeddings | `scripts/embeddings_modelos.py`, `scripts/indexar_embeddings.py`, `data/resultados/indexacion_embeddings.json`, `notebooks/13_comparar_modelos_embedding.ipynb`, `data/resultados/modelos_embedding.csv` y `data/resultados/modelos_embedding_por_pregunta.csv` |
 | Consulta integrada | `scripts/consultar_rag.py` |
 | Validación final | `scripts/validar_rag_final.py` y `data/resultados/validacion_final.csv` |
 
 ## 10. Conclusión
 
-El RAG deja de ser una colección de pruebas aisladas y queda convertido en una configuración trazable y ejecutable. La decisión final equilibra calidad, contexto y latencia: nomic + Qdrant + estructura 1500/200 + 20 candidatos + MiniLM-L6 + top 4. El siguiente trabajo ya no es elegir componentes, sino observar su comportamiento dentro del agente real y ampliar el golden set con fallos encontrados en uso.
+El RAG deja de ser una colección de pruebas aisladas y queda convertido en una configuración trazable y ejecutable. La decisión final equilibra calidad, contexto y latencia: nomic + Qdrant + estructura 1500/200 + 20 candidatos + MiniLM-L6 + top 4, con filtro opcional por `modulo`. El siguiente trabajo ya no es elegir componentes, sino observar su comportamiento dentro del agente real y ampliar el golden set con fallos encontrados en uso.
