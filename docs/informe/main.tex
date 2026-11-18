@@ -1,0 +1,372 @@
+%% Informe de investigación del RAG sobre la documentación de Python 3.15.
+%% Plantilla: Springer Nature LaTeX (clase sn-jnl), la de docs/2e1a74e1-04f7-414a-b201-5374c12d3c2f.pdf.
+%%
+%% Compilar en Overleaf:
+%%   1. New Project > Templates > «Springer Nature LaTeX Template» (trae sn-jnl.cls y los .bst).
+%%   2. Sustituye su main.tex por este fichero y sube referencias.bib.
+%%   3. Compilador pdfLaTeX. Compila dos veces (o Recompile) para las referencias.
+%%
+%% Pendiente de completar a mano: apellidos, correo de contacto y la contribución de Josemi.
+
+\documentclass[pdflatex,sn-mathphys-num]{sn-jnl}
+
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{amsthm}
+\usepackage{mathrsfs}
+\usepackage[title]{appendix}
+\usepackage{xcolor}
+\usepackage{textcomp}
+\usepackage{manyfoot}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage{listings}
+
+\raggedbottom
+
+\begin{document}
+
+\title[RAG local sobre la documentación de Python]{Diseño y evaluación de un RAG local sobre la documentación oficial de Python 3.15 para un agente de programación}
+
+\author[1]{\fnm{Sergio}}
+\author[1]{\fnm{María}}
+\author[1]{\fnm{Josemi}}
+
+\affil[1]{\orgname{Neoland}, \orgdiv{Bootcamp de Python e Inteligencia Artificial}}
+
+\abstract{Un agente que programa en Python acierta más si consulta la documentación oficial en lugar de responder de memoria. Este trabajo diseña, mide y valida un sistema de generación aumentada por recuperación (RAG) local sobre los 508 ficheros Markdown de la documentación de Python~3.15. Cada componente se eligió con un experimento que cambia una sola variable, sobre un \emph{golden set} de 35 preguntas (32 con respuesta y 3 sin ella) y con un criterio de decisión escrito antes de medir. La configuración final usa \texttt{nomic-embed-text} en Ollama, Qdrant como servidor, troceo por estructura Markdown (máximo 1500 y mínimo 200 caracteres), 20 candidatos reordenados con el \emph{cross-encoder} MiniLM-L6 y los 4 mejores fragmentos. Recupera la fuente correcta en 30 de 32 preguntas y un fragmento con la evidencia literal en 26; con un filtro por módulo, en 31 y 28. Cinco modelos de embeddings más recientes no superan a nomic por el margen exigido. Por último, una \emph{skill} de instrucciones para el agente y dos pruebas de programación muestran que el RAG acierta el módulo casi siempre, pero que el agente debe reformular la pregunta con el nombre exacto de la API, buscar las restricciones de forma explícita y ejecutar el código.}
+
+\keywords{RAG, embeddings, reranking, troceo, Qdrant, agentes de programación}
+
+\maketitle
+
+%% ---------------------------------------------------------------------------
+\section{Introducción}\label{sec:intro}
+
+Los modelos de lenguaje escriben código con lo que recuerdan de su entrenamiento. Con una biblioteca estándar tan amplia y cambiante como la de Python, eso produce firmas inventadas, parámetros obsoletos y reglas olvidadas. La generación aumentada por recuperación (RAG) reduce ese problema: antes de responder, el sistema busca en una colección de documentos los fragmentos relevantes y los entrega al modelo como contexto~\cite{lewis2020rag}.
+
+El objetivo de este trabajo es incorporar al flujo de un agente de programación un paso «consultar el RAG» sobre la documentación oficial de Python~3.15~\cite{pythondocs}. La premisa de diseño es un crecimiento controlado: la información a la que accede el agente es limitada (508 ficheros, 9,6~MB), así que no se diseña para millones de documentos y se priorizan las soluciones locales, sin coste por consulta y sin que los datos salgan de la máquina.
+
+La investigación responde seis preguntas de diseño (modelo de embeddings, base vectorial, \emph{reranking}, número de resultados, tamaño de fragmento y búsqueda híbrida) y tres de mejora posteriores (métrica de evidencia, filtros por metadatos y modelos de embeddings más recientes). Cada pregunta tiene una ficha propia en el repositorio~\cite{repo}; este artículo reúne sus resultados, el método común y lo aprendido al poner el RAG en manos de un agente.
+
+%% ---------------------------------------------------------------------------
+\section{Resultados}\label{sec:resultados}
+
+La Tabla~\ref{tab:config} resume la configuración final. Las subsecciones siguientes dan la evidencia de cada decisión, en el orden en que se tomaron. Todas las métricas se describen en la Sección~\ref{sec:metodos}.
+
+\begin{table}[h]
+\caption{Configuración final del RAG}\label{tab:config}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Componente & Decisión \\
+\midrule
+Idioma de recuperación & Pregunta y corpus en inglés \\
+Embeddings & \texttt{nomic-embed-text} en Ollama, con prefijos de consulta y documento \\
+Base vectorial & Qdrant 1.20.2 como servidor Docker, distancia coseno \\
+Troceo & Estructura Markdown, máximo 1500 y mínimo 200, sin ruta de títulos \\
+Recuperación & 20 candidatos \\
+\emph{Reranker} & \texttt{cross-encoder/ms-marco-MiniLM-L-6-v2} \\
+Resultado & 4 fragmentos \\
+Búsqueda híbrida & No \\
+Metadatos & Seis campos por fragmento; filtro opcional por \texttt{modulo} \\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Modelo de embeddings}\label{sec:res-emb}
+
+Los rankings generales de embeddings~\cite{muennighoff2023mteb} no garantizan el resultado en un corpus técnico con mucho código, así que se midió sobre el nuestro. Se compararon tres modelos locales con fragmentos fijos de 500 caracteres (Tabla~\ref{tab:emb}). \texttt{nomic-embed-text}~\cite{nussbaum2024nomic} obtuvo el mejor hit@4 y el mejor MRR, aunque la ventaja era de una o dos preguntas. Se eligió por esa ventaja y por ser local y privado, y la elección se volvió a comprobar con la configuración final (Sección~\ref{sec:res-modelos}).
+
+\begin{table}[h]
+\caption{Comparación inicial de modelos de embeddings (fragmentos de 500 caracteres, $k=4$)}\label{tab:emb}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Modelo & hit@1 & hit@4 & MRR \\
+\midrule
+all-MiniLM-L6-v2~\cite{wang2020minilm} & 0,656 & 0,844 & 0,734 \\
+bge-base-en-v1.5~\cite{xiao2023cpack} & 0,562 & 0,875 & 0,706 \\
+\textbf{nomic-embed-text} & \textbf{0,656} & \textbf{0,906} & \textbf{0,755} \\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Base vectorial}\label{sec:res-bd}
+
+El requisito era que varios agentes consulten a la vez. Qdrant~\cite{qdrantasync} y Chroma~\cite{chromaarch} recibieron los mismos 7955 vectores y se midieron como servidores HTTP con clientes asíncronos, 640 búsquedas por ronda y tres rondas (Tabla~\ref{tab:bd}). No hubo errores, el primer resultado coincidió en todas las consultas y el solape de los 20 primeros fue del 99,2\,\%. Con ocho clientes, Qdrant ofrece un 19,9\,\% más de consultas por segundo; con uno, Chroma es más rápido. Se eligió Qdrant porque el requisito es la concurrencia.
+
+\begin{table}[h]
+\caption{Rendimiento de Qdrant y Chroma según el número de clientes concurrentes}\label{tab:bd}
+\begin{tabular}{@{}rcccc@{}}
+\toprule
+Clientes & Qdrant (consultas/s) & Chroma (consultas/s) & Qdrant p95 & Chroma p95 \\
+\midrule
+1 & 354,8 & \textbf{408,8} & 4,02 ms & \textbf{3,12 ms} \\
+4 & \textbf{587,0} & 539,6 & \textbf{8,61 ms} & 9,75 ms \\
+8 & \textbf{728,8} & 607,6 & 15,52 ms & \textbf{14,80 ms} \\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Troceo}\label{sec:res-troceo}
+
+Se midieron 18 configuraciones de troceo~\cite{pineconechunking}. La Tabla~\ref{tab:troceo} muestra las más representativas. Pasar de fragmentos fijos a secciones Markdown mantuvo el acierto por fuente y subió la evidencia y su orden. Incluir la ruta de títulos en el texto embebido no compensó.
+
+\begin{table}[h]
+\caption{Troceo: fragmentos fijos frente a estructura Markdown (sin \emph{reranker}, una evidencia por fuente). Entre paréntesis, preguntas acertadas de 32}\label{tab:troceo}
+\begin{tabular}{@{}lrccc@{}}
+\toprule
+Configuración & Fragmentos & hit@4 & ev\_hit@4 & ev\_MRR \\
+\midrule
+Fijo 300 & 32\,156 & 0,844 (27) & 0,438 (14) & 0,341 \\
+Fijo 500 & 19\,393 & 0,906 (29) & 0,375 (12) & 0,271 \\
+Fijo 1000 & 9\,816 & 0,906 (29) & 0,500 (16) & 0,378 \\
+Fijo 1500 & 6\,639 & 0,906 (29) & 0,563 (18) & 0,422 \\
+Estructura 1500/200, con ruta & 7\,955 & 0,875 (28) & 0,594 (19) & 0,477 \\
+\textbf{Estructura 1500/200, sin ruta} & \textbf{7\,955} & \textbf{0,906 (29)} & \textbf{0,594 (19)} & \textbf{0,477} \\
+\botrule
+\end{tabular}
+\end{table}
+
+El troceo por estructura no parte las secciones largas: 773 de los 7955 fragmentos superan los 1500 caracteres y el mayor, en \texttt{library/tkinter.md}, tiene 203\,072. Una variante con límite duro los reduce a 69 bloques de código y recupera dos evidencias que antes faltaban, pero con \emph{reranker} pierde una evidencia y una fuente (25 y 29 frente a 26 y 30), así que no cumplió el criterio y no se adoptó.
+
+\subsection{Número de resultados}\label{sec:res-k}
+
+La hipótesis de partida era que uno o dos fragmentos bastan. La Tabla~\ref{tab:k} la refuta: $k=1$ y $k=2$ pierden seis y cuatro evidencias frente a $k=4$. $k=8$ gana tres, pero duplica el texto que llega al modelo, y los contextos largos no se aprovechan por igual~\cite{liu2023lost}. Se eligió $k=4$.
+
+\begin{table}[h]
+\caption{Aciertos por evidencia según el número de fragmentos devueltos}\label{tab:k}
+\begin{tabular}{@{}rcc@{}}
+\toprule
+$k$ & Aciertos por evidencia & Diferencia con $k=4$ \\
+\midrule
+1 & 13/32 & $-6$ \\
+2 & 15/32 & $-4$ \\
+\textbf{4} & \textbf{19/32} & referencia \\
+8 & 22/32 & $+3$ \\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Reranking}\label{sec:res-rerank}
+
+Un \emph{cross-encoder} puntúa cada par pregunta-fragmento y reordena los candidatos de la búsqueda vectorial~\cite{nogueira2019rerank,sbertrerank}. Se fijó un límite de 500~ms de latencia antes de medir (Tabla~\ref{tab:rerank}). MiniLM-L6~\cite{minilmcross} recupera tres evidencias más que la búsqueda sin \emph{reranking} en 119,4~ms. \texttt{bge-reranker-base} acierta una más, pero tarda 502,2~ms y queda fuera del límite.
+
+\begin{table}[h]
+\caption{\emph{Reranking} de 20 candidatos a 4 resultados}\label{tab:rerank}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Configuración & hit@4 & ev\_hit@4 & Latencia del \emph{reranking} \\
+\midrule
+Sin \emph{reranking} & 29/32 & 19/32 & 0 ms \\
+\textbf{MiniLM-L6} & \textbf{30/32} & \textbf{22/32} & \textbf{119,4 ms} \\
+bge-reranker-base & 29/32 & 23/32 & 502,2 ms \\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Búsqueda híbrida}\label{sec:res-hibrida}
+
+La búsqueda híbrida combina vectores densos con BM25 para capturar términos exactos~\cite{qdranthybrid}. Sin \emph{reranker} añade dos evidencias, pero con él solo una, y ninguna en la categoría de términos exactos (Tabla~\ref{tab:hibrida}). El umbral exigía dos, así que no se incorporó.
+
+\begin{table}[h]
+\caption{Búsqueda vectorial frente a híbrida (B: preguntas de términos exactos)}\label{tab:hibrida}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Configuración & hit@4 & ev\_hit@4 & ev\_hit@4 en B \\
+\midrule
+Vectorial & 29/32 & 19/32 & 7/10 \\
+Híbrida & 29/32 & 21/32 & 8/10 \\
+\textbf{Vectorial + \emph{reranking}} & \textbf{30/32} & \textbf{22/32} & \textbf{8/10} \\
+Híbrida + \emph{reranking} & 30/32 & 23/32 & 8/10 \\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Validación de la configuración completa}\label{sec:res-validacion}
+
+Las 35 preguntas se ejecutaron a través del mismo módulo que usa el agente. Una revisión manual de los fallos mostró que la métrica de evidencia era demasiado estricta: cuatro preguntas tenían la respuesta en el top~4 con otra redacción. Con varias evidencias aceptadas por fuente, el resultado pasó de 22 a 26 aciertos por evidencia (Tabla~\ref{tab:validacion}).
+
+\begin{table}[h]
+\caption{Validación de la configuración final (preguntas A--D, varias evidencias por fuente)}\label{tab:validacion}
+\begin{tabular}{@{}lc@{}}
+\toprule
+Métrica & Resultado \\
+\midrule
+hit@1 por fuente & 0,688 (22/32) \\
+hit@4 por fuente & \textbf{0,938 (30/32)} \\
+MRR por fuente & 0,797 \\
+ev\_hit@1 & 0,438 (14/32) \\
+ev\_hit@4 & \textbf{0,813 (26/32)} \\
+ev\_MRR & 0,604 \\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Filtros por metadatos}\label{sec:res-metadatos}
+
+Cada fragmento guarda seis metadatos calculados del corpus: \texttt{modulo}, \texttt{tipo\_pagina}, \texttt{simbolos}, \texttt{deprecated}, \texttt{added\_in} y \texttt{tiene\_codigo}. La consulta acepta un filtro, y si ningún candidato filtrado supera un umbral de confianza del \emph{reranker} (0,0), repite la búsqueda sin filtro. El filtro «perfecto» sale de la fuente esperada en el \emph{golden set} y mide el techo de un agente que siempre acierta el módulo; el «equivocado» usa el módulo de otra pregunta (Tabla~\ref{tab:metadatos}).
+
+\begin{table}[h]
+\caption{Filtros por metadatos sobre la configuración final}\label{tab:metadatos}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Configuración & hit@4 & ev\_hit@4 & Repeticiones \\
+\midrule
+Sin filtro & 30/32 & 26/32 & -- \\
+\texttt{modulo} perfecto, sin repetición & 32/32 & 29/32 & 0 \\
+\textbf{\texttt{modulo} perfecto, con repetición} & \textbf{31/32} & \textbf{28/32} & 1 \\
+\texttt{modulo} equivocado, con repetición & 29/32 & 26/32 & 20 de 22 \\
+\texttt{tipo\_pagina} perfecto, sin repetición & 30/32 & 26/32 & 0 \\
+\texttt{tipo\_pagina} equivocado, con repetición & 19/32 & 15/32 & 21 de 32 \\
+\botrule
+\end{tabular}
+\end{table}
+
+El filtro por módulo con repetición gana dos evidencias y, si el agente se equivoca de módulo, la repetición lo devuelve al resultado sin filtro. El filtro por tipo de página no mejora y un valor equivocado no siempre se corrige, así que el agente solo filtra por módulo.
+
+\subsection{Modelos de embeddings con la configuración final}\label{sec:res-modelos}
+
+Con el resto de la configuración fijo, se compararon cinco modelos más recientes frente a nomic, cada uno en su colección y con los prefijos de su ficha oficial~\cite{qwen3emb,bgem3,embeddinggemma,jinacode}. El criterio, escrito antes de medir, exigía al menos dos evidencias más que nomic (30/32) sin perder fuentes. La Tabla~\ref{tab:modelos} da la configuración que decide: con \emph{reranker} y filtro por módulo con repetición. Las latencias se midieron con el \emph{reranker} en GPU.
+
+\begin{table}[h]
+\caption{Modelos de embeddings con la configuración final}\label{tab:modelos}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Modelo & Contexto (tokens) & hit@4 & ev\_hit@4 & Latencia media \\
+\midrule
+\textbf{nomic-embed-text} & 2048 & 31/32 & \textbf{28/32} & 105,7 ms \\
+qwen3-embedding 0.6B & 8192 & 31/32 & 27/32 & 109,8 ms \\
+qwen3-embedding 8B\footnotemark[1] & 8192 & 32/32 & \textbf{28/32} & 256,1 ms \\
+bge-m3 & 8192 & 32/32 & \textbf{28/32} & 117,3 ms \\
+embeddinggemma 300M & 2048 & 32/32 & 27/32 & 151,2 ms \\
+jina-code-embeddings 1.5B & 8192 & 31/32 & 25/32 & 106,0 ms \\
+\botrule
+\end{tabular}
+\footnotetext[1]{No cabe entero en los 8~GB de la GPU: Ollama lo reparte entre GPU (88\,\%) y CPU (12\,\%), así que su latencia no es comparable.}
+\end{table}
+
+Ningún modelo pasa de 28 evidencias, así que se mantiene nomic. Hay dos observaciones que no cambian la decisión. Primero, jina-code, especializado en código, es el peor: las preguntas del \emph{golden set} se responden con prosa de la documentación. Segundo, embeddinggemma \emph{sin reranker} logra 28/32 evidencias con 62~ms de latencia, y con \emph{reranker} baja a 27: el \emph{reranker} ordena peor que el propio modelo.
+
+\subsection{Uso por un agente}\label{sec:res-agente}
+
+El RAG se expone como una orden de consola que devuelve los fragmentos en JSON. Para que un agente lo use bien se escribió una \emph{skill}, un fichero de instrucciones que el agente carga al programar. Se probó con dos programas: un analizador concurrente de logs, con nueve decisiones de API, escrito por el equipo, y un resumen de gastos de nivel inicial, con diez consultas, escrito por un agente sin contexto previo que solo recibió la \emph{skill}.
+
+Las consultas con filtro por módulo devolvieron siempre fragmentos de ese módulo. En cinco consultas, sin embargo, el primer fragmento no nombraba la API buscada: por ejemplo, «\emph{How do I apply a timeout\ldots}» devolvió \texttt{wait\_for} en lugar de \texttt{asyncio.timeout}, y «\emph{What exception does float() raise\ldots}», sin filtro, devolvió \texttt{re.PatternError} con una puntuación alta del \emph{reranker} (4,2). Al repetir la pregunta con el nombre exacto de la API, esta salió en primera posición en cuatro casos y en segunda en el quinto (\texttt{dict.get}).
+
+Tres fallos del código no los evitó el RAG y los detectó la ejecución:
+\begin{enumerate}
+\item \texttt{return} no puede ir dentro de un bloque \texttt{except*}. La regla está en la documentación, pero al final de un fragmento ocupado por un ejemplo largo, y no salió ni preguntando por ella.
+\item Un \texttt{asyncio.timeout} deja de esperar a \texttt{asyncio.to\_thread}, pero el hilo sigue hasta terminar y \texttt{asyncio.run} lo espera al cerrar. El dato está repartido entre tres páginas.
+\item Un CSV guardado con BOM rompía la lectura. Se corrigió con la codificación \texttt{utf-8-sig}, consultada después al RAG.
+\end{enumerate}
+
+%% ---------------------------------------------------------------------------
+\section{Métodos}\label{sec:metodos}
+
+\subsection{Corpus}
+
+La documentación oficial de Python~3.15~\cite{pythondocs} se convirtió de HTML a Markdown y se limpió de navegación y elementos repetidos. El corpus final tiene 508 ficheros y 9,6~MB, en inglés. Para que la recuperación funcione igual con preguntas en español, el agente traduce la pregunta al inglés antes de consultar.
+
+\subsection{Golden set}
+
+Se escribieron 35 preguntas reales en cinco categorías: consulta puntual (A, 10 preguntas), términos exactos y siglas (B, 10), conceptos y comportamiento (C, 9), varias fuentes (D, 3) y preguntas sin respuesta en el corpus (E, 3). Cada pregunta de A a D lleva la fuente donde está la respuesta y una o varias subcadenas literales que la prueban (evidencias), comprobadas contra el corpus. Las preguntas E solo se usan para observar la puntuación del \emph{reranker}.
+
+\subsection{Métricas}
+
+\begin{itemize}
+\item \textbf{hit@$k$ por fuente}: proporción de preguntas con un fragmento de la fuente esperada entre los $k$ primeros.
+\item \textbf{ev\_hit@$k$ por evidencia}: proporción de preguntas con un fragmento que contiene alguna de sus evidencias literales entre los $k$ primeros. Es más exigente: la fuente correcta no garantiza el fragmento correcto.
+\item \textbf{MRR} y \textbf{ev\_MRR}: media del inverso de la posición del primer acierto, por fuente y por evidencia.
+\item \textbf{Latencia}: tiempo medio por consulta, con embedding, búsqueda y \emph{reranking}.
+\end{itemize}
+
+\subsection{Diseño experimental}
+
+Cada experimento parte de la configuración vigente y cambia una sola variable. Antes de medir se escribe la hipótesis y un criterio de decisión numérico, por ejemplo «al menos dos evidencias más sin perder fuentes» o «menos de 500~ms de \emph{reranking}». La decisión aplica ese criterio aunque el resultado invite a moverlo. Cada experimento vive en un \emph{notebook} que guarda sus resultados en CSV, por pregunta y agregados, y en una ficha con estructura IMRaD.
+
+\subsection{Entorno}
+
+Qdrant~1.20.2 se ejecutó en Docker y los modelos de embeddings en Ollama. Las primeras fichas se midieron en un MacBook M2 Pro y las últimas en un portátil Windows con una GPU RTX~4070 de 8~GB, con PyTorch~2.14.1 y CUDA. Las latencias de máquinas o dispositivos distintos no se comparan entre sí.
+
+\subsection{Flujo de trabajo}
+
+Cada mejora se gestionó como una \emph{issue} de GitHub con especificación, plan y tareas, en una rama propia con \emph{pull request} a una rama de integración. Agentes con papeles separados escribieron el código, los tests y la documentación, y un agente revisor comprobó en cada ronda que la documentación solo afirmara lo que respaldan el código y los CSV.
+
+%% ---------------------------------------------------------------------------
+\section{Discusión}\label{sec:discusion}
+
+\textbf{La fuente correcta no basta.} En la configuración final, 30 preguntas encuentran el fichero correcto, pero solo 26 encuentran un fragmento con la evidencia. Medir solo por fuente habría sobrestimado la calidad, y la métrica por evidencia fue la que guio las mejoras.
+
+\textbf{El troceo pesó más que el modelo.} Cambiar de modelo de embeddings movió una o dos preguntas en la comparación inicial y, con la configuración final, ninguno de los cinco modelos nuevos superó a nomic. Respetar la estructura del documento mejoró la evidencia y su orden sin perder fuentes. En documentación técnica, cómo se trocea importa más que qué modelo embebe.
+
+\textbf{Las mejoras se solapan.} La búsqueda híbrida aportaba dos evidencias antes del \emph{reranker} y una después. El filtro por módulo y el \emph{reranker} también compiten por las mismas preguntas. Cada mejora debe medirse sobre la configuración vigente, no sobre una referencia antigua.
+
+\textbf{Los criterios previos evitaron elegir por intuición.} \texttt{bge-reranker-base} quedó 2,2~ms por encima del límite, BM25 sumó una evidencia cuando se exigían dos y qwen3-8B y bge-m3 empataron con nomic. Fijar el criterio antes de medir evitó adoptar la opción más llamativa sin ganancia suficiente.
+
+\textbf{El agente completa al RAG.} Las pruebas con agentes muestran tres límites que el RAG no resuelve solo: las preguntas genéricas devuelven la API vecina, las reglas cortas quedan escondidas al final de fragmentos con código, y algunos avisos están repartidos entre páginas. Las instrucciones de la \emph{skill} cubren los dos primeros (reformular con el nombre exacto y preguntar por las restricciones). Para el tercero, la defensa es ejecutar el código.
+
+\textbf{Limitaciones.} Hay un solo corpus y 32 preguntas evaluables, así que una pregunta mueve una proporción en 0,031. La mayoría de experimentos se ejecutó una vez. La evidencia literal solo acepta las redacciones listadas. No se evaluó la respuesta generada por el modelo, solo la recuperación. El filtro perfecto mide un techo: cuánto acierta un agente real al elegir el módulo no se ha medido. Las pruebas con agentes son dos programas y sirven como ilustración, no como medida.
+
+%% ---------------------------------------------------------------------------
+\section{Conclusión}\label{sec:conclusion}
+
+El RAG final combina nomic, Qdrant, troceo por estructura 1500/200, 20 candidatos, MiniLM-L6, los 4 mejores fragmentos y un filtro opcional por módulo. Recupera la evidencia de 26 de 32 preguntas, y de 28 con el filtro. Cada componente se justifica con un experimento reproducible y un criterio fijado de antemano. Ni modelos de embeddings más grandes ni la búsqueda híbrida mejoraron lo suficiente para cambiarlo.
+
+El siguiente paso ya no es elegir componentes, sino observar el RAG dentro del agente real: medir cuánto acierta el agente el módulo, ampliar el \emph{golden set} con los fallos encontrados en uso y estudiar dos mejoras que las pruebas señalan, traer los fragmentos vecinos de la misma sección y la búsqueda por identificador exacto.
+
+\backmatter
+
+\bmhead{Información complementaria}
+Las fichas de investigación, los \emph{notebooks}, los CSV de resultados, la \emph{skill} y los dos programas de prueba están en el repositorio del proyecto~\cite{repo}.
+
+\section*{Declaraciones}
+
+\begin{itemize}
+\item \textbf{Financiación:} no aplica.
+\item \textbf{Conflicto de intereses:} no aplica.
+\item \textbf{Aprobación ética:} no aplica.
+\item \textbf{Disponibilidad de datos:} el \emph{golden set}, las evidencias y los resultados en CSV están en el repositorio~\cite{repo}. El corpus se genera a partir de la documentación pública de Python~\cite{pythondocs}.
+\item \textbf{Disponibilidad del código:} el código está en el repositorio~\cite{repo}.
+\item \textbf{Contribución de los autores:} María realizó las fichas 1 a 6, la validación final y la comparativa consolidada. Sergio realizó la revisión de la métrica de evidencia, el troceo con límite duro, los filtros por metadatos, la comparación de modelos de embeddings y la \emph{skill} para el agente. \textcolor{red}{[Completar la contribución de Josemi.]}
+\end{itemize}
+
+\begin{appendices}
+
+\section{Paso «consultar el RAG»}\label{sec:apendice-consulta}
+
+\begin{algorithm}
+\caption{Consulta del RAG con filtro opcional por módulo}\label{alg:consulta}
+\begin{algorithmic}[1]
+\Require pregunta $q$ en inglés, filtro opcional $f$, umbral $u = 0$
+\State $v \gets$ embedding de \texttt{search\_query:} $q$ con nomic
+\State $C \gets$ 20 vecinos de $v$ en Qdrant que cumplen $f$
+\State puntuar cada par $(q, c)$, $c \in C$, con MiniLM-L6 y ordenar
+\If{$f$ existe \textbf{and} ($C = \emptyset$ \textbf{or} la mejor puntuación $< u$)}
+  \State $C \gets$ 20 vecinos de $v$ sin filtro; puntuar y ordenar
+\EndIf
+\State \Return los 4 primeros de $C$
+\end{algorithmic}
+\end{algorithm}
+
+\section{Procedimiento de la \emph{skill} para el agente}\label{sec:apendice-skill}
+
+\begin{enumerate}
+\item Una pregunta por decisión de API, en inglés.
+\item Filtrar por módulo cuando se conoce; para funciones y tipos integrados, por la carpeta \texttt{builtins}.
+\item Comprobar que el primer fragmento nombra la API buscada, aunque su puntuación sea alta; si no, repetir con el nombre exacto.
+\item Preguntar por las restricciones de forma explícita.
+\item Revisar también la API que envuelve al código (por ejemplo, qué hace \texttt{asyncio.run} al terminar).
+\item Comprobar la versión: el corpus es de Python~3.15.
+\item Citar la fuente.
+\item Ejecutar el código.
+\end{enumerate}
+
+\end{appendices}
+
+\bibliography{referencias}
+
+\end{document}
