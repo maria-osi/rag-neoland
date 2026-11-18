@@ -7,7 +7,9 @@ import json
 import re
 from pathlib import Path
 
-# Única fuente de los prefijos de cada modelo.
+_QWEN3_QUERY = "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
+
+# Única fuente de los prefijos de cada modelo. `num_ctx` solo lo definen los modelos que lo fijan al embeber.
 MODELOS: dict[str, dict] = {
     "minilm": {
         "proveedor": "sentence-transformers",
@@ -26,6 +28,41 @@ MODELOS: dict[str, dict] = {
         "nombre": "nomic-embed-text",
         "prefijo_query": "search_query: ",
         "prefijo_documento": "search_document: ",
+    },
+    "qwen3_06b": {
+        "proveedor": "ollama",
+        "nombre": "qwen3-embedding:0.6b",
+        "prefijo_query": _QWEN3_QUERY,
+        "prefijo_documento": "",
+        "num_ctx": 8192,
+    },
+    "qwen3_8b": {
+        "proveedor": "ollama",
+        "nombre": "qwen3-embedding:8b",
+        "prefijo_query": _QWEN3_QUERY,
+        "prefijo_documento": "",
+        "num_ctx": 8192,
+    },
+    "bge_m3": {
+        "proveedor": "ollama",
+        "nombre": "bge-m3",
+        "prefijo_query": "",
+        "prefijo_documento": "",
+        "num_ctx": 8192,
+    },
+    "embeddinggemma": {
+        "proveedor": "ollama",
+        "nombre": "embeddinggemma",
+        "prefijo_query": "task: search result | query: ",
+        "prefijo_documento": "title: none | text: ",
+        "num_ctx": 2048,
+    },
+    "jina_code": {
+        "proveedor": "sentence-transformers",
+        "nombre": "jinaai/jina-code-embeddings-1.5b",
+        "prefijo_query": "Find the most relevant answer given the following question:\n",
+        "prefijo_documento": "Candidate answer:\n",
+        "num_ctx": 8192,
     },
 }
 
