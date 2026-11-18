@@ -872,3 +872,44 @@ def test_troceo_limitado_decision():
     assert consultar_rag.COLECCION == elegida
     if elegida == "pydocs_nomic_est1500_m200_sinruta":
         assert "notebook 11" not in (RAIZ / "scripts" / "consultar_rag.py").read_text(encoding="utf-8")
+
+
+# Issue #28, escenario 1
+_QWEN3 = "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
+
+
+@pytest.mark.parametrize(
+    "clave,proveedor,nombre,prefijo_query,prefijo_documento",
+    [
+        ("qwen3_06b", "ollama", "qwen3-embedding:0.6b", _QWEN3, ""),
+        ("qwen3_8b", "ollama", "qwen3-embedding:8b", _QWEN3, ""),
+        ("bge_m3", "ollama", "bge-m3", "", ""),
+        ("embeddinggemma", "ollama", "embeddinggemma", "task: search result | query: ", "title: none | text: "),
+        (
+            "jina_code",
+            "sentence-transformers",
+            "jinaai/jina-code-embeddings-1.5b",
+            "Find the most relevant answer given the following question:\n",
+            "Candidate answer:\n",
+        ),
+        ("nomic", "ollama", "nomic-embed-text", "search_query: ", "search_document: "),
+    ],
+)
+def test_prefijos_de_la_ficha_oficial(clave, proveedor, nombre, prefijo_query, prefijo_documento):
+    assert ce.MODELOS[clave]["proveedor"] == proveedor
+    assert ce.MODELOS[clave]["nombre"] == nombre
+    assert ce.preparar_query(clave, "q") == prefijo_query + "q"
+    assert ce.preparar_documento(clave, "c") == prefijo_documento + "c"
+
+
+# Issue #28, escenario 2
+@pytest.mark.parametrize(
+    "clave,num_ctx",
+    [("qwen3_06b", 8192), ("qwen3_8b", 8192), ("bge_m3", 8192), ("jina_code", 8192), ("embeddinggemma", 2048)],
+)
+def test_num_ctx_por_modelo(clave, num_ctx):
+    assert ce.MODELOS[clave]["num_ctx"] == num_ctx
+
+
+def test_nomic_no_define_num_ctx():
+    assert "num_ctx" not in ce.MODELOS["nomic"]

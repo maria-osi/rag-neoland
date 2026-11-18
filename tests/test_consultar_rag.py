@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+import torch
 
 import consultar_rag as cr
 
@@ -208,3 +209,229 @@ def test_filtros_invalidos_fallan_antes_del_embedding(filtros):
         consultor.consultar("pregunta", filtros=filtros)
     assert ollama.llamadas == 0
     assert qdrant.consultas == []
+
+
+# Issue #28
+class OllamaConOpciones:
+    """Como OllamaFalso, pero acepta los argumentos extra de los modelos con num_ctx."""
+
+    def __init__(self):
+        self.llamadas = []
+
+    def embed(self, model, input, **extra):
+        self.llamadas.append({"model": model, "input": input, **extra})
+        return SimpleNamespace(embeddings=[[0.1, 0.2]])
+
+
+class RerankerQueFalla:
+    def __init__(self):
+        self.llamadas = 0
+
+    def predict(self, pares):
+        self.llamadas += 1
+        raise AssertionError("el reranker no debe llamarse")
+
+
+# Escenario 10
+def test_consultor_por_defecto_no_cambia():
+    class OllamaEstricto(OllamaFalso):
+        pass
+
+    ollama = OllamaEstricto()
+    qdrant = QdrantFalso()
+    consultor = cr.ConsultorRAG(qdrant, ollama, RerankerFalso())
+
+    resultados = consultor.consultar("What is a context manager?")
+
+    assert cr.COLECCION == "pydocs_nomic_est1500_m200_sinruta"
+    assert cr.MODELO == "nomic"
+    assert qdrant.ultima_consulta["coleccion"] == "pydocs_nomic_est1500_m200_sinruta"
+    # OllamaFalso.embed solo admite model e input: un argumento extra fallaría.
+    assert ollama.ultima_entrada == {
+        "model": "nomic-embed-text",
+        "input": ["search_query: What is a context manager?"],
+    }
+    assert resultados[0]["score_reranking"] == 0.9
+
+
+# Escenario 11
+def test_consultor_de_otro_modelo():
+    ollama = OllamaConOpciones()
+    qdrant = QdrantFalso()
+    consultor = cr.ConsultorRAG(
+        qdrant, ollama, RerankerFalso(), coleccion="pydocs_embeddinggemma_est1500_m200_sinruta", modelo="embeddinggemma"
+    )
+
+    consultor.consultar("What is a context manager?")
+
+    assert qdrant.ultima_consulta["coleccion"] == "pydocs_embeddinggemma_est1500_m200_sinruta"
+    assert len(ollama.llamadas) == 1
+    llamada = ollama.llamadas[0]
+    assert llamada["model"] == "embeddinggemma"
+    assert llamada["input"] == ["task: search result | query: What is a context manager?"]
+    assert llamada["options"]["num_ctx"] == 2048
+
+
+def test_consultor_con_sentence_transformers_usa_el_codificador():
+    class Codificador:
+        max_seq_length = None
+
+        def __init__(self):
+            self.entradas = []
+
+        def encode(self, textos, normalize_embeddings):
+            self.entradas.append(list(textos))
+            return [[0.3, 0.4] for _ in textos]
+
+        tokenizer = staticmethod(lambda texto, add_special_tokens=True: {"input_ids": [0]})
+
+    codificador = Codificador()
+    ollama = OllamaConOpciones()
+    qdrant = QdrantFalso()
+    consultor = cr.ConsultorRAG(
+        qdrant, ollama, RerankerFalso(), coleccion="pydocs_jina_code_est1500_m200_sinruta", modelo="jina_code",
+        codificador=codificador,
+    )
+
+    consultor.consultar("What is a context manager?")
+
+    assert ollama.llamadas == []
+    assert codificador.entradas == [
+        ["Find the most relevant answer given the following question:\nWhat is a context manager?"]
+    ]
+    assert qdrant.ultima_consulta["query"] == [0.3, 0.4]
+
+
+# Escenario 12
+def test_sin_reranker_ordena_por_score_vectorial():
+    qdrant = QdrantFalso()
+    reranker = RerankerQueFalla()
+    consultor = cr.ConsultorRAG(qdrant, OllamaFalso(), reranker)
+
+    resultados = consultor.consultar("pregunta", reordenar=False)
+
+    assert reranker.llamadas == 0
+    assert len(resultados) == 4
+    assert [r["id"] for r in resultados] == [0, 1, 2, 3]
+    scores = [r["score_vectorial"] for r in resultados]
+    assert scores == sorted(scores, reverse=True)
+    assert all(r["score_reranking"] is None for r in resultados)
+
+
+def test_sin_reranker_ordena_aunque_qdrant_devuelva_desordenado():
+    class QdrantDesordenado(QdrantFalso):
+        def query_points(self, coleccion, query, limit, with_payload, **extra):
+            respuesta = super().query_points(coleccion, query, limit, with_payload, **extra)
+            respuesta.points.reverse()
+            return respuesta
+
+    consultor = cr.ConsultorRAG(QdrantDesordenado(), OllamaFalso(), RerankerQueFalla())
+    resultados = consultor.consultar("pregunta", reordenar=False, k=3)
+    assert [r["id"] for r in resultados] == [0, 1, 2]
+
+
+# Escenario 13
+def test_sin_reranker_con_filtro_sin_candidatos_repite_sin_filtro():
+    qdrant = QdrantVacioConFiltro()
+    reranker = RerankerQueFalla()
+    consultor = cr.ConsultorRAG(qdrant, OllamaFalso(), reranker)
+
+    resultados = consultor.consultar("pregunta", filtros={"modulo": "x"}, reordenar=False)
+
+    assert len(qdrant.consultas) == 2
+    assert "query_filter" in qdrant.consultas[0]
+    assert "query_filter" not in qdrant.consultas[1]
+    assert reranker.llamadas == 0
+    assert len(resultados) == 4
+    assert all(r["filtrado"] is False for r in resultados)
+
+
+def test_sin_reranker_con_filtro_con_candidatos_no_repite():
+    qdrant = QdrantFalso()
+    consultor = cr.ConsultorRAG(qdrant, OllamaFalso(), RerankerQueFalla())
+
+    resultados = consultor.consultar("pregunta", filtros={"modulo": "logging"}, reordenar=False)
+
+    assert len(qdrant.consultas) == 1
+    assert "query_filter" in qdrant.consultas[0]
+    assert len(resultados) == 4
+    assert all(r["filtrado"] is True for r in resultados)
+
+
+def test_sin_reranker_con_filtro_y_menos_de_k_devuelve_los_que_hay():
+    class QdrantPocos(QdrantFalso):
+        def query_points(self, coleccion, query, limit, with_payload, **extra):
+            respuesta = super().query_points(coleccion, query, limit, with_payload, **extra)
+            respuesta.points = respuesta.points[:2]
+            return respuesta
+
+    qdrant = QdrantPocos()
+    resultados = cr.ConsultorRAG(qdrant, OllamaFalso(), RerankerQueFalla()).consultar(
+        "pregunta", filtros={"modulo": "x"}, reordenar=False
+    )
+    assert len(qdrant.consultas) == 1
+    assert len(resultados) == 2
+
+
+# Escenario 18
+def test_local_crea_el_reranker_en_el_dispositivo(monkeypatch):
+    creados = []
+
+    class CrossEncoderFalso:
+        def __init__(self, *args, **kwargs):
+            creados.append((args, kwargs))
+
+    class QdrantLocalFalso:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_collection(self, nombre):
+            return object()
+
+        def scroll(self, nombre, limit, with_payload, with_vectors):
+            return [SimpleNamespace(payload={"modulo": "m"})], None
+
+    class ClienteOllamaFalso:
+        def show(self, nombre):
+            return object()
+
+    monkeypatch.setattr(cr, "CrossEncoder", CrossEncoderFalso)
+    monkeypatch.setattr(cr, "QdrantClient", QdrantLocalFalso)
+    monkeypatch.setattr(cr.ollama, "Client", ClienteOllamaFalso)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+
+    consultor = cr.ConsultorRAG.local()
+
+    assert creados == [((cr.RERANKER,), {"device": "cuda"})]
+    assert consultor.coleccion == cr.COLECCION
+    assert consultor.modelo == cr.MODELO
+    assert consultor.codificador is None
+
+
+def test_local_de_jina_code_carga_el_codificador(monkeypatch):
+    import torch
+
+    cargados = []
+
+    class QdrantLocalFalso:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_collection(self, nombre):
+            return object()
+
+        def scroll(self, nombre, limit, with_payload, with_vectors):
+            return [SimpleNamespace(payload={"modulo": "m"})], None
+
+    monkeypatch.setattr(cr, "CrossEncoder", lambda *a, **k: object())
+    monkeypatch.setattr(cr, "QdrantClient", QdrantLocalFalso)
+    monkeypatch.setattr(cr.ollama, "Client", lambda: object())
+    monkeypatch.setattr(cr, "cargar_codificador", lambda clave: cargados.append(clave) or "codificador")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+
+    consultor = cr.ConsultorRAG.local("pydocs_jina_code_est1500_m200_sinruta", "jina_code")
+
+    assert cargados == ["jina_code"]
+    assert consultor.codificador == "codificador"
+    assert consultor.modelo == "jina_code"
